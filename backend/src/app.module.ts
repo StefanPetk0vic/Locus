@@ -8,6 +8,8 @@ import { UserModule } from './user/user.module';
 import { User } from './user/user.entity';
 import { Driver } from './user/driver.entity';
 import { Rider } from './user/rider.entity';
+import { RideModule } from './ride/ride.module';
+import { RideEntity } from './ride/infrastructure/ride.entity';
 
 @Module({
   imports: [
@@ -25,13 +27,13 @@ import { Rider } from './user/rider.entity';
         username: configService.get('DB_USERNAME') ?? 'postgres',
         password: configService.get('DB_PASSWORD') ?? 'admin',
         database: configService.get('DB_NAME') ?? 'taxi_app',
-        entities: [User, Driver, Rider],
+        entities: [User, Driver, Rider, RideEntity],
         synchronize: true,
       }),
     }),
-
     AuthModule,
     UserModule,
+    RideModule,
   ],
   controllers: [AppController],
   providers: [AppService],
