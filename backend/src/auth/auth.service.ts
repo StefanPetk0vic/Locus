@@ -5,48 +5,47 @@ import {AuthCredentialsDTO, LoginCredentialsDTO} from './dto/auth-credentials.dt
 import * as bcrypt from 'bcrypt';
 import {JwtService} from '@nestjs/jwt';
 
-import {User} from '../user/user.entity';
-import { Rider } from '../user/rider.entity';
-import { Driver } from '../user/driver.entity';
-import { UserRole } from '../user/user.entity';
+import {User} from '../user/infrastructure/user.entity';
+import { Rider } from '../user/infrastructure/rider.entity';
+import { Driver } from '../user/infrastructure/driver.entity';
+import { UserRole } from '../user/infrastructure/user.entity';
 
 @Injectable()
 export class AuthService {
     constructor(
         @InjectRepository(User)
         private userRepository: Repository<User>,
+        @InjectRepository(Driver)
+        private driverRepository: Repository<Driver>,
+        @InjectRepository(Rider)
+        private riderRepository: Repository<Rider>,
         private jwtService: JwtService,
     ) {}
 
     async register(authCredentialsDTO: AuthCredentialsDTO): Promise<void> {
-    const { email, password, firstName, lastName, licensePlate } = authCredentialsDTO;
+    const { email, password, firstName, lastName, licensePlate, role } = authCredentialsDTO;
     const salt = await bcrypt.genSalt();
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    let user: User;
-
-    // if (role === UserRole.DRIVER && licensePlate) {
-    //     const driver = new Driver();
-    //     driver.email = email;
-    //     driver.password = hashedPassword;
-    //     driver.firstName = firstName;
-    //     driver.lastName = lastName;
-    //     driver.licensePlate = licensePlate;
-    //     driver.isAdmin = false;
-    //     user = driver;
-    // } else {
-    const rider = new Rider();
-    rider.email = email;
-    rider.password = hashedPassword;
-    rider.firstName = firstName;
-    rider.lastName = lastName;
-    rider.isAdmin = false;
-    rider.role = UserRole.RIDER;
-    user = rider;
-    // }
-
     try {
-        await this.userRepository.save(user);
+        if (role === UserRole.DRIVER && licensePlate) {
+            const driver = new Driver();
+            driver.email = email;
+            driver.password = hashedPassword;
+            driver.firstName = firstName;
+            driver.lastName = lastName;
+            driver.licensePlate = licensePlate;
+            driver.isAdmin = false;
+            await this.driverRepository.save(driver);
+        } else {
+            const rider = new Rider();
+            rider.email = email;
+            rider.password = hashedPassword;
+            rider.firstName = firstName;
+            rider.lastName = lastName;
+            rider.isAdmin = false;
+            await this.riderRepository.save(rider);
+        }
     } catch (error) {
         if (error.code === "23505") {
             throw new ConflictException('Email already exists');

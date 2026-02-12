@@ -2,11 +2,13 @@ import { Inject, Injectable } from '@nestjs/common';
 import { ClientKafka } from '@nestjs/microservices';
 import { RideRepository } from './ride.repository';
 import { Ride, RideStatus } from './domain/ride.model';
+import { UserService } from '../user/user.service';
 
 @Injectable()
 export class RideService {
   constructor(
     private readonly rideRepository: RideRepository,
+    private readonly userService: UserService,
     @Inject('RIDE_SERVICE') private readonly kafkaClient: ClientKafka,
   ) {}
 
@@ -23,7 +25,17 @@ export class RideService {
 
     const savedRide = await this.rideRepository.save(newRide);
 
-    this.kafkaClient.emit('ride.requested', JSON.stringify(savedRide));
+    this.kafkaClient.emit('ride.requested', {
+      id: savedRide.id,
+      pickupLat: savedRide.pickupLat,
+      pickupLng: savedRide.pickupLng,
+      destinationLat: savedRide.destinationLat,
+      destinationLng: savedRide.destinationLng,
+      status: savedRide.status,
+      riderId: savedRide.riderId,
+      driverId: savedRide.driverId,
+      createdAt: savedRide.createdAt,
+    });
 
     return savedRide;
   }
@@ -36,7 +48,31 @@ export class RideService {
 
     const updatedRide = await this.rideRepository.save(ride);
 
-    this.kafkaClient.emit('ride.accepted', { rideId, driverId, status: updatedRide.status });
+    this.kafkaClient.emit('ride.accepted', { rideId, driverId, riderId: ride.riderId, status: updatedRide.status });
+
+    return updatedRide;
+  }
+
+  async findRideById(rideId: string): Promise<Ride | null> {
+    return this.rideRepository.findById(rideId);
+  }
+
+  async completeRide(rideId: string): Promise<Ride> {
+    const ride = await this.rideRepository.findById(rideId);
+    if (!ride) throw new Error('Ride not found');
+
+    ride.completeRide();
+
+    const updatedRide = await this.rideRepository.save(ride);
+
+    await this.userService.incrementRiderRideCount(ride.riderId);
+
+    this.kafkaClient.emit('ride.completed', { 
+      rideId, 
+      riderId: ride.riderId, 
+      driverId: ride.driverId,
+      status: updatedRide.status 
+    });
 
     return updatedRide;
   }

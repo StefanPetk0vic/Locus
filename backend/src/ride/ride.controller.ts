@@ -1,14 +1,20 @@
-import { Controller, Post, Body, Param, Patch, UseGuards, OnModuleInit, Inject } from '@nestjs/common';
+import { Controller, Post, Body, Param, Patch, UseGuards, OnModuleInit, Inject, Logger } from '@nestjs/common';
 import { ClientKafka, EventPattern, Payload } from '@nestjs/microservices';
 import { RideService } from './ride.service';
 import { AuthGuard } from '@nestjs/passport';
 import { GetUser } from '../auth/get-user.decorator';
-import { User } from '../user/user.entity';
+import { User, UserRole } from '../user/infrastructure/user.entity';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
+import { RideGateway } from './ride.gateway';
 
 @Controller('rides')
 export class RideController implements OnModuleInit {
+  private readonly logger = new Logger(RideController.name);
+
   constructor(
     private readonly rideService: RideService,
+    private readonly rideGateway: RideGateway,
     @Inject('RIDE_SERVICE') private readonly kafkaClient: ClientKafka
   ) {}
 
@@ -29,22 +35,75 @@ export class RideController implements OnModuleInit {
   }
 
   @Patch('/:id/accept')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.DRIVER)
   async acceptRide(@Param('id') rideId: string, @GetUser() user: User) {
     const driverId = user.id; 
     return this.rideService.acceptRide(rideId, driverId);
   }
 
+  @Post('/:id/location')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.DRIVER)
+  async updateDriverLocation(
+    @Param('id') rideId: string,
+    @Body() body: { lat: number; lng: number },
+    @GetUser() driver: User
+  ) {
+    this.logger.log(`Driver ${driver.id} updating location for ride ${rideId}: (${body.lat}, ${body.lng})`);
+    
+
+    const ride = await this.rideService.findRideById(rideId);
+    
+    if (!ride) {
+      return { error: 'Ride not found' };
+    }
+
+    if (ride.driverId !== driver.id) {
+      return { error: 'You are not the driver of this ride' };
+    }
+
+    this.rideGateway.notifyRiderAboutDriverLocation(ride.riderId, {
+      rideId,
+      driverId: driver.id,
+      location: {
+        lat: body.lat,
+        lng: body.lng,
+      },
+      timestamp: new Date(),
+    });
+
+    return { status: 'ok', message: 'Location sent to rider' };
+  }
 
   @EventPattern('ride.requested')
   async handleRideRequested(@Payload() message: any) {
-    console.log('⚡ [KAFKA] Nova vožnja zatražena:', message);
-    // Ovde bi išla logika za obaveštavanje vozača preko Websocketa
+    this.logger.log('Nova voznja zatrazena:', message);
+    
+    this.rideGateway.notifyDriversAboutNewRide({
+      rideId: message.id,
+      riderId: message.riderId,
+      pickup: {
+        lat: message.pickupLat,
+        lng: message.pickupLng,
+      },
+      destination: {
+        lat: message.destinationLat,
+        lng: message.destinationLng,
+      },
+      timestamp: new Date(),
+    });
   }
 
   @EventPattern('ride.accepted')
   async handleRideAccepted(@Payload() message: any) {
-    console.log('✅ [KAFKA] Vožnja prihvaćena:', message);
-    // Obaveštavanje putnika da je vozilo krenulo
+    this.logger.log('Voznja prihvacena:', message);
+    
+    this.rideGateway.notifyRiderAboutAcceptedRide(message.riderId, {
+      rideId: message.rideId,
+      driverId: message.driverId,
+      status: 'accepted',
+      timestamp: new Date(),
+    });
   }
 }

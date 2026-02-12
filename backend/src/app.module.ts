@@ -5,9 +5,9 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
-import { User } from './user/user.entity';
-import { Driver } from './user/driver.entity';
-import { Rider } from './user/rider.entity';
+import { User } from './user/infrastructure/user.entity';
+import { Driver } from './user/infrastructure/driver.entity';
+import { Rider } from './user/infrastructure/rider.entity';
 import { RideModule } from './ride/ride.module';
 import { RideEntity } from './ride/infrastructure/ride.entity';
 
@@ -23,10 +23,10 @@ import { RideEntity } from './ride/infrastructure/ride.entity';
       useFactory: async (configService: ConfigService) => ({
         type: 'postgres',
         host: configService.get('DB_HOST') ?? 'localhost',
-        port: +configService.get('DB_PORT') || 5432,
-        username: configService.get('DB_USERNAME') ?? 'postgres',
-        password: configService.get('DB_PASSWORD') ?? 'admin',
-        database: configService.get('DB_NAME') ?? 'taxi_app',
+        port: +configService.get('DB_PORT') || 5433,
+        username: configService.get('DB_USERNAME') ?? 'elfak',
+        password: configService.get('DB_PASSWORD') ?? 'locus123',
+        database: configService.get('DB_NAME') ?? 'locus',
         entities: [User, Driver, Rider, RideEntity],
         synchronize: true,
       }),

@@ -1,14 +1,27 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ClientsModule, Transport } from '@nestjs/microservices';
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { RideEntity } from './infrastructure/ride.entity';
 import { RideRepository } from './ride.repository';
 import { RideService } from './ride.service';
 import { RideController } from './ride.controller';
+import { RideGateway } from './ride.gateway';
+import { User } from '../user/infrastructure/user.entity';
+import { UserModule } from '../user/user.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([RideEntity]),
+    TypeOrmModule.forFeature([RideEntity, User]),
+    UserModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get('JWT_SECRET'),
+      }),
+      inject: [ConfigService],
+    }),
     ClientsModule.register([
       {
         name: 'RIDE_SERVICE',
@@ -26,7 +39,7 @@ import { RideController } from './ride.controller';
     ]),
   ],
   controllers: [RideController],
-  providers: [RideRepository, RideService],
-  exports: [RideRepository, RideService],
+  providers: [RideRepository, RideService, RideGateway],
+  exports: [RideRepository, RideService, RideGateway],
 })
 export class RideModule {}

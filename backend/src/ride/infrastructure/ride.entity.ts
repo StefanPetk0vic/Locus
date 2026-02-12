@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
-import { Rider } from '../../user/rider.entity';
-import { Driver } from '../../user/driver.entity';
+import { Rider } from '../../user/infrastructure/rider.entity';
+import { Driver } from '../../user/infrastructure/driver.entity';
 import { RideStatus } from '../domain/ride.model';
 
 @Entity('rides')

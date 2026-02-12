@@ -1,3 +1,5 @@
+name: locus
+
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
@@ -34,9 +36,9 @@ services:
   postgres:
     image: postgres:17
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: admin
-      POSTGRES_DB: locus
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
       - "5433:5432"
     volumes:

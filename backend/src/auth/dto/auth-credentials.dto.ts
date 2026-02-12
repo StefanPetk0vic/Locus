@@ -1,5 +1,5 @@
 import { IsString, IsEnum, MinLength, IsEmail, IsOptional, Matches } from 'class-validator';
-import { UserRole } from '../../user/user.entity';
+import { UserRole } from '../../user/infrastructure/user.entity';
 
 export class AuthCredentialsDTO {
     @IsEmail()
@@ -18,9 +18,9 @@ export class AuthCredentialsDTO {
     @IsString()
     lastName: string;
 
-    // @IsEnum(UserRole)
-    // @IsOptional()
-    // role: UserRole;
+    @IsEnum(UserRole)
+    @IsOptional()
+    role: UserRole;
 
     @IsOptional()
     @IsString()
