@@ -13,6 +13,8 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserRole } from '../user/infrastructure/user.entity';
+import { RideRepository } from './ride.repository';
+
 
 interface AuthenticatedSocket extends Socket {
   user?: User;
@@ -28,13 +30,16 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server: Server;
 
   private readonly logger = new Logger(RideGateway.name);
-  private driverSockets = new Map<string, string>(); // userId -> socketId
-  private riderSockets = new Map<string, string>(); // userId -> socketId
+  private driverSockets = new Map<string, string>(); 
+  private riderSockets = new Map<string, string>(); 
+
+  private lastLocationUpdate = new Map<string, number>();
 
   constructor(
     private jwtService: JwtService,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    private readonly rideRepository: RideRepository,
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -111,7 +116,7 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleDisconnect(client: AuthenticatedSocket) {
     if (client.user) {
       const userId = client.user.id;
-      
+      this.lastLocationUpdate.delete(client.user.id);
       if (this.driverSockets.get(userId) === client.id) {
         this.driverSockets.delete(userId);
         this.logger.log(`Driver ${client.user.email} disconnected`);
@@ -127,8 +132,8 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.log(`Connected drivers count: ${this.driverSockets.size}`);
     this.logger.log(`Connected riders count: ${this.riderSockets.size}`);
     
-    this.server.emit('ride.requested', rideData);
-    this.logger.log('Broadcasted to ALL connected clients');
+    // this.server.emit('ride.requested', rideData);
+    // this.logger.log('Broadcasted to ALL connected clients');
     
     this.server.to('drivers').emit('ride.requested', rideData);
     this.logger.log('Sent to drivers room');
@@ -153,18 +158,29 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  @SubscribeMessage('driver.location.update')
-  handleDriverLocationUpdate(
+    @SubscribeMessage('driver.location.update')
+  async handleDriverLocationUpdate(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { rideId: string; lat: number; lng: number },
   ) {
-    if (client.user?.role !== UserRole.DRIVER) {
-      this.logger.warn(`Non-driver ${client.user?.id} tried to send location update`);
-      return;
-    }
+    if (client.user?.role !== UserRole.DRIVER) return;
 
-    this.logger.log(`Driver ${client.user.id} location update for ride ${data.rideId}: (${data.lat}, ${data.lng})`);
-    
-    return { status: 'ok', message: 'Location updated' };
+    const now = Date.now();
+    const last = this.lastLocationUpdate.get(client.user.id) ?? 0;
+
+    if (now - last < 2000) return;
+    this.lastLocationUpdate.set(client.user.id, now);
+
+    const ride = await this.rideRepository.findById(data.rideId);
+    if (!ride) return;
+    if (ride.driverId !== client.user.id) return;
+
+    this.notifyRiderAboutDriverLocation(ride.riderId, {
+      rideId: data.rideId,
+      driverId: client.user.id,
+      lat: data.lat,
+      lng: data.lng,
+      timestamp: new Date(),
+    });
   }
 }

@@ -96,14 +96,22 @@ export class RideController implements OnModuleInit {
   }
 
   @EventPattern('ride.accepted')
-  async handleRideAccepted(@Payload() message: any) {
-    this.logger.log('Voznja prihvacena:', message);
-    
-    this.rideGateway.notifyRiderAboutAcceptedRide(message.riderId, {
-      rideId: message.rideId,
-      driverId: message.driverId,
-      status: 'accepted',
-      timestamp: new Date(),
-    });
+async handleRideAccepted(@Payload() payload: any) {
+  const message = payload?.value ?? payload;
+
+  this.logger.log('Voznja prihvacena:', message);
+
+  if (!message?.riderId) {
+    this.logger.error('ride.accepted payload missing riderId', payload);
+    return;
   }
+
+  this.rideGateway.notifyRiderAboutAcceptedRide(message.riderId, {
+    rideId: message.rideId,
+    driverId: message.driverId,
+    status: 'accepted',
+    timestamp: new Date(),
+  });
+}
+
 }
