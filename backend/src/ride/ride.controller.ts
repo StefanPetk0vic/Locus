@@ -76,6 +76,12 @@ export class RideController implements OnModuleInit {
     return { status: 'ok', message: 'Location sent to rider' };
   }
 
+  @Patch('/:id/cancel')
+  @UseGuards(AuthGuard('jwt'))
+  async cancelRide(@Param('id') rideId: string, @GetUser() user: User) {
+    return this.rideService.cancelRide(rideId, user.id);
+  }
+
   @Patch('/:id/start')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.DRIVER)

@@ -76,6 +76,27 @@ export class RideService {
     return updatedRide;
   }
 
+  async cancelRide(rideId: string, userId: string): Promise<Ride> {
+    const ride = await this.rideRepository.findById(rideId);
+    if (!ride) throw new Error('Ride not found');
+    if (ride.riderId !== userId && ride.driverId !== userId) {
+      throw new Error('You are not part of this ride');
+    }
+
+    ride.cancelRide();
+
+    const updatedRide = await this.rideRepository.save(ride);
+
+    this.kafkaClient.emit('ride.cancelled', {
+      rideId,
+      riderId: ride.riderId,
+      driverId: ride.driverId,
+      status: updatedRide.status,
+    });
+
+    return updatedRide;
+  }
+
   async completeRide(rideId: string): Promise<Ride> {
     const ride = await this.rideRepository.findById(rideId);
     if (!ride) throw new Error('Ride not found');

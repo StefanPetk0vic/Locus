@@ -35,6 +35,16 @@ export class Ride {
     this.status = RideStatus.IN_PROGRESS;
   }
 
+  cancelRide() {
+    if (this.status === RideStatus.IN_PROGRESS) {
+      throw new Error('Ride cannot be cancelled while in progress.');
+    }
+    if (this.status === RideStatus.COMPLETED || this.status === RideStatus.CANCELLED) {
+      throw new Error('Ride is already finished.');
+    }
+    this.status = RideStatus.CANCELLED;
+  }
+
   completeRide() {
     if (this.status !== RideStatus.IN_PROGRESS) {
         throw new Error('Ride must be in progress to be completed.');
