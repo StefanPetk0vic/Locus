@@ -76,6 +76,35 @@ export class RideController implements OnModuleInit {
     return { status: 'ok', message: 'Location sent to rider' };
   }
 
+  @Patch('/:id/start')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.DRIVER)
+  async startRide(@Param('id') rideId: string, @GetUser() driver: User) {
+    const ride = await this.rideService.startRide(rideId, driver.id);
+    this.rideGateway.notifyRiderAboutRideStarted(ride.riderId, {
+      rideId: ride.id,
+      driverId: ride.driverId,
+      status: ride.status,
+    });
+    return ride;
+  }
+
+  @Patch('/:id/complete')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(UserRole.DRIVER)
+  async completeRide(@Param('id') rideId: string, @GetUser() driver: User) {
+    const ride = await this.rideService.findRideById(rideId);
+    if (!ride) throw new Error('Ride not found');
+    if (ride.driverId !== driver.id) throw new Error('You are not the driver of this ride');
+    const completed = await this.rideService.completeRide(rideId);
+    this.rideGateway.notifyRiderAboutRideCompleted(completed.riderId, {
+      rideId: completed.id,
+      driverId: completed.driverId,
+      status: completed.status,
+    });
+    return completed;
+  }
+
   @EventPattern('ride.requested')
   async handleRideRequested(@Payload() message: any) {
     this.logger.log('Nova voznja zatrazena:', message);

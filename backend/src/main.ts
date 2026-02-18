@@ -8,6 +8,11 @@ async function bootstrap() {
     logger: ['log', 'error', 'warn', 'debug', 'verbose'],
   });
 
+  app.enableCors({
+    origin: true,
+    credentials: true,
+  });
+
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.KAFKA,
     options: {
@@ -21,8 +26,9 @@ async function bootstrap() {
   });
 
   await app.startAllMicroservices();
-  await app.listen(3000);
+  await app.listen(3000, '0.0.0.0');
   
   Logger.log(`Application is running on: http://localhost:3000`, 'Bootstrap');
+  Logger.log(`Network access: http://192.168.1.9:3000`, 'Bootstrap');
 }
 bootstrap();

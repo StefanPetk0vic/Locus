@@ -28,6 +28,13 @@ export class Ride {
     this.status = RideStatus.ACCEPTED;
   }
 
+  startRide() {
+    if (this.status !== RideStatus.ACCEPTED) {
+      throw new Error('Ride must be accepted to start.');
+    }
+    this.status = RideStatus.IN_PROGRESS;
+  }
+
   completeRide() {
     if (this.status !== RideStatus.IN_PROGRESS) {
         throw new Error('Ride must be in progress to be completed.');

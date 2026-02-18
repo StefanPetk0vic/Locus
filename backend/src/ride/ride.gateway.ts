@@ -132,9 +132,6 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.log(`Connected drivers count: ${this.driverSockets.size}`);
     this.logger.log(`Connected riders count: ${this.riderSockets.size}`);
     
-    // this.server.emit('ride.requested', rideData);
-    // this.logger.log('Broadcasted to ALL connected clients');
-    
     this.server.to('drivers').emit('ride.requested', rideData);
     this.logger.log('Sent to drivers room');
   }
@@ -155,6 +152,28 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
     
     if (socketId) {
       this.server.to(socketId).emit('driver.location.update', locationData);
+    }
+  }
+
+  notifyRiderAboutRideStarted(riderId: string, rideData: any) {
+    const socketId = this.riderSockets.get(riderId);
+
+    if (socketId) {
+      this.logger.log(`Notifying rider ${riderId} about ride started`);
+      this.server.to(socketId).emit('ride.started', rideData);
+    } else {
+      this.logger.warn(`Rider ${riderId} is not connected (ride.started)`);
+    }
+  }
+
+  notifyRiderAboutRideCompleted(riderId: string, rideData: any) {
+    const socketId = this.riderSockets.get(riderId);
+
+    if (socketId) {
+      this.logger.log(`Notifying rider ${riderId} about ride completed`);
+      this.server.to(socketId).emit('ride.completed', rideData);
+    } else {
+      this.logger.warn(`Rider ${riderId} is not connected (ride.completed)`);
     }
   }
 
