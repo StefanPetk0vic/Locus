@@ -12,6 +12,7 @@ export class DriverMapper {
       entity.licensePlate,
       entity.isVerified,
       entity.isAdmin,
+      entity.isAvailable,
     );
   }
 
@@ -25,6 +26,7 @@ export class DriverMapper {
     entity.licensePlate = domain.licensePlate;
     entity.isVerified = domain.isVerified;
     entity.isAdmin = domain.isAdmin;
+    entity.isAvailable = domain.isAvailable;
     return entity;
   }
 }

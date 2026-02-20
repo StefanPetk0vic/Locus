@@ -10,6 +10,7 @@ export class Driver extends User {
     public licensePlate: string,
     public isVerified: boolean = false,
     isAdmin: boolean = false,
+    public isAvailable: boolean = true,
   ) {
     super(id, email, password, firstName, lastName, UserRole.DRIVER, isAdmin);
   }
@@ -33,7 +34,7 @@ export class Driver extends User {
   }
 
   canAcceptRides(): boolean {
-    return this.isVerified;
+    return this.isVerified && this.isAvailable;
   }
 
   updateLicensePlate(newPlate: string): void {

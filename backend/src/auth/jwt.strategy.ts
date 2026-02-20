@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 export interface JwtPayload {
   email: string;
   id: string;
+  role: 'DRIVER' | 'RIDER';
 }
 
 @Injectable()
@@ -20,13 +21,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      secretOrKey: configService.get('JWT_SECRET') ?? 'defaultSecret', 
+      secretOrKey: configService.get('JWT_SECRET') ?? 'defaultSecret',
     });
   }
 
   async validate(payload: JwtPayload): Promise<User> {
     const { email } = payload;
-    
+
     const user = await this.userRepository.findOne({ where: { email } });
 
     if (!user) {

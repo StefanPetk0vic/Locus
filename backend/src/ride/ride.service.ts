@@ -12,7 +12,13 @@ export class RideService {
     @Inject('RIDE_SERVICE') private readonly kafkaClient: ClientKafka,
   ) {}
 
-  async requestRide(riderId: string, pickupLat: number, pickupLng: number, destLat: number, destLng: number) {
+  async requestRide(
+    riderId: string,
+    pickupLat: number,
+    pickupLng: number,
+    destLat: number,
+    destLng: number,
+  ) {
     const newRide = new Ride(
       crypto.randomUUID(),
       pickupLat,
@@ -48,7 +54,12 @@ export class RideService {
 
     const updatedRide = await this.rideRepository.save(ride);
 
-    this.kafkaClient.emit('ride.accepted', { rideId, driverId, riderId: ride.riderId, status: updatedRide.status });
+    this.kafkaClient.emit('ride.accepted', {
+      rideId,
+      driverId,
+      riderId: ride.riderId,
+      status: updatedRide.status,
+    });
 
     return updatedRide;
   }
@@ -60,7 +71,8 @@ export class RideService {
   async startRide(rideId: string, driverId: string): Promise<Ride> {
     const ride = await this.rideRepository.findById(rideId);
     if (!ride) throw new Error('Ride not found');
-    if (ride.driverId !== driverId) throw new Error('You are not the driver of this ride');
+    if (ride.driverId !== driverId)
+      throw new Error('You are not the driver of this ride');
 
     ride.startRide();
 
@@ -107,13 +119,21 @@ export class RideService {
 
     await this.userService.incrementRiderRideCount(ride.riderId);
 
-    this.kafkaClient.emit('ride.completed', { 
-      rideId, 
-      riderId: ride.riderId, 
+    this.kafkaClient.emit('ride.completed', {
+      rideId,
+      riderId: ride.riderId,
       driverId: ride.driverId,
-      status: updatedRide.status 
+      status: updatedRide.status,
     });
 
     return updatedRide;
+  }
+
+  async getCompletedRidesForRider(riderId: string) {
+    return this.rideRepository.findCompletedRidesForRider(riderId);
+  }
+
+  async getCompletedRidesForDriver(driverId: string) {
+    return this.rideRepository.findCompletedRidesForDriver(driverId);
   }
 }

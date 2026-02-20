@@ -1,4 +1,15 @@
-import { Controller, Post, Body, Param, Patch, UseGuards, OnModuleInit, Inject, Logger } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Param,
+  Patch,
+  UseGuards,
+  OnModuleInit,
+  Inject,
+  Logger,
+  Get,
+} from '@nestjs/common';
 import { ClientKafka, EventPattern, Payload } from '@nestjs/microservices';
 import { RideService } from './ride.service';
 import { AuthGuard } from '@nestjs/passport';
@@ -8,6 +19,8 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { RideGateway } from './ride.gateway';
 
+import type { JwtPayload } from '../auth/jwt.strategy';
+
 @Controller('rides')
 export class RideController implements OnModuleInit {
   private readonly logger = new Logger(RideController.name);
@@ -15,7 +28,7 @@ export class RideController implements OnModuleInit {
   constructor(
     private readonly rideService: RideService,
     private readonly rideGateway: RideGateway,
-    @Inject('RIDE_SERVICE') private readonly kafkaClient: ClientKafka
+    @Inject('RIDE_SERVICE') private readonly kafkaClient: ClientKafka,
   ) {}
 
   async onModuleInit() {
@@ -27,18 +40,30 @@ export class RideController implements OnModuleInit {
   @Post('/request')
   @UseGuards(AuthGuard('jwt'))
   async requestRide(
-    @Body() body: { pickupLat: number; pickupLng: number; destLat: number; destLng: number },
-    @GetUser() user: User
+    @Body()
+    body: {
+      pickupLat: number;
+      pickupLng: number;
+      destLat: number;
+      destLng: number;
+    },
+    @GetUser() user: User,
   ) {
     const riderId = user.id;
-    return this.rideService.requestRide(riderId, body.pickupLat, body.pickupLng, body.destLat, body.destLng);
+    return this.rideService.requestRide(
+      riderId,
+      body.pickupLat,
+      body.pickupLng,
+      body.destLat,
+      body.destLng,
+    );
   }
 
   @Patch('/:id/accept')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.DRIVER)
   async acceptRide(@Param('id') rideId: string, @GetUser() user: User) {
-    const driverId = user.id; 
+    const driverId = user.id;
     return this.rideService.acceptRide(rideId, driverId);
   }
 
@@ -48,13 +73,14 @@ export class RideController implements OnModuleInit {
   async updateDriverLocation(
     @Param('id') rideId: string,
     @Body() body: { lat: number; lng: number },
-    @GetUser() driver: User
+    @GetUser() driver: User,
   ) {
-    this.logger.log(`Driver ${driver.id} updating location for ride ${rideId}: (${body.lat}, ${body.lng})`);
-    
+    this.logger.log(
+      `Driver ${driver.id} updating location for ride ${rideId}: (${body.lat}, ${body.lng})`,
+    );
 
     const ride = await this.rideService.findRideById(rideId);
-    
+
     if (!ride) {
       return { error: 'Ride not found' };
     }
@@ -101,7 +127,8 @@ export class RideController implements OnModuleInit {
   async completeRide(@Param('id') rideId: string, @GetUser() driver: User) {
     const ride = await this.rideService.findRideById(rideId);
     if (!ride) throw new Error('Ride not found');
-    if (ride.driverId !== driver.id) throw new Error('You are not the driver of this ride');
+    if (ride.driverId !== driver.id)
+      throw new Error('You are not the driver of this ride');
     const completed = await this.rideService.completeRide(rideId);
     this.rideGateway.notifyRiderAboutRideCompleted(completed.riderId, {
       rideId: completed.id,
@@ -114,7 +141,7 @@ export class RideController implements OnModuleInit {
   @EventPattern('ride.requested')
   async handleRideRequested(@Payload() message: any) {
     this.logger.log('Nova voznja zatrazena:', message);
-    
+
     this.rideGateway.notifyDriversAboutNewRide({
       rideId: message.id,
       riderId: message.riderId,
@@ -131,22 +158,33 @@ export class RideController implements OnModuleInit {
   }
 
   @EventPattern('ride.accepted')
-async handleRideAccepted(@Payload() payload: any) {
-  const message = payload?.value ?? payload;
+  async handleRideAccepted(@Payload() payload: any) {
+    const message = payload?.value ?? payload;
 
-  this.logger.log('Voznja prihvacena:', message);
+    this.logger.log('Voznja prihvacena:', message);
 
-  if (!message?.riderId) {
-    this.logger.error('ride.accepted payload missing riderId', payload);
-    return;
+    if (!message?.riderId) {
+      this.logger.error('ride.accepted payload missing riderId', payload);
+      return;
+    }
+
+    this.rideGateway.notifyRiderAboutAcceptedRide(message.riderId, {
+      rideId: message.rideId,
+      driverId: message.driverId,
+      status: 'accepted',
+      timestamp: new Date(),
+    });
   }
 
-  this.rideGateway.notifyRiderAboutAcceptedRide(message.riderId, {
-    rideId: message.rideId,
-    driverId: message.driverId,
-    status: 'accepted',
-    timestamp: new Date(),
-  });
-}
-
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Get('completed')
+  async getCompletedRides(@GetUser() user: JwtPayload) {
+    if (user.role === 'DRIVER') {
+      console.log(user.role);
+      return this.rideService.getCompletedRidesForDriver(user.id);
+    } else {
+      console.log(user.role);
+      return this.rideService.getCompletedRidesForRider(user.id);
+    }
+  }
 }

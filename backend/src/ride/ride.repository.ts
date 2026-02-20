@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { RideEntity } from './infrastructure/ride.entity';
 import { Ride } from './domain/ride.model';
 import { RideMapper } from './infrastructure/ride.mapper';
-
+import { RideStatus } from './domain/ride.model';
 @Injectable()
 export class RideRepository {
   constructor(
@@ -28,6 +28,22 @@ export class RideRepository {
     const entities = await this.typeOrmRepository.find({
       where: { status: 'REQUESTED' } as any,
     });
-    return entities.map(entity => RideMapper.toDomain(entity));
+    return entities.map((entity) => RideMapper.toDomain(entity));
+  }
+
+  async findCompletedRidesForRider(riderId: string): Promise<Ride[]> {
+    const entities = await this.typeOrmRepository.find({
+      where: { riderId, status: RideStatus.COMPLETED },
+      order: { createdAt: 'DESC' },
+    });
+    return entities.map((entity) => RideMapper.toDomain(entity));
+  }
+
+  async findCompletedRidesForDriver(driverId: string): Promise<Ride[]> {
+    const entities = await this.typeOrmRepository.find({
+      where: { driverId, status: RideStatus.COMPLETED },
+      order: { createdAt: 'DESC' },
+    });
+    return entities.map((entity) => RideMapper.toDomain(entity));
   }
 }

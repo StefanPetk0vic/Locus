@@ -10,6 +10,7 @@ import { Driver } from './user/infrastructure/driver.entity';
 import { Rider } from './user/infrastructure/rider.entity';
 import { RideModule } from './ride/ride.module';
 import { RideEntity } from './ride/infrastructure/ride.entity';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { RideEntity } from './ride/infrastructure/ride.entity';
     AuthModule,
     UserModule,
     RideModule,
+    RedisModule,
   ],
   controllers: [AppController],
   providers: [AppService],

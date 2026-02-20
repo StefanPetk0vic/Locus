@@ -8,4 +8,7 @@ export class Driver extends User {
 
   @Column({ default: false })
   isVerified: boolean;
+
+  @Column({ default: true })
+  isAvailable: boolean;
 }
