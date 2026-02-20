@@ -4,7 +4,7 @@
 - [ ] Napraviti da se prvo najblizem slobodnom vozacu posalje zahtev da vozi
 - [x] Dodati novu kolonu za vozaca da li vozi trenutno
 - [x] Dodati redis
-- [ ] Completed rides mora da se GET iz rides iz baze
+- [x] Completed rides mora da se GET iz rides iz baze
 - [ ] Dodati recenzije
 - [ ] Dodati vozila za vozace - vechile details
 - [ ] Kada se zavrsi voznja da se prikaze korisniku endscreen sa cenom
