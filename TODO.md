@@ -2,7 +2,8 @@
 
 - [x] Ride in progress ne moze da bude cancellovan
 - [ ] Napraviti da se prvo najblizem slobodnom vozacu posalje zahtev da vozi
-- [ ] Dodati novu kolonu za vozaca da li vozi trenutno
+- [x] Dodati novu kolonu za vozaca da li vozi trenutno
+- [x] Dodati redis
 - [ ] Completed rides mora da se GET iz rides iz baze
 - [ ] Dodati recenzije
 - [ ] Dodati vozila za vozace - vechile details
