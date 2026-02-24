@@ -83,4 +83,4 @@ export class RedisService implements OnModuleDestroy {
       'ASC', 'COUNT', count,
     )) as string[];
   }
-
+}
