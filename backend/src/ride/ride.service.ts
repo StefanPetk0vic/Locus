@@ -1,14 +1,16 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { ClientKafka } from '@nestjs/microservices';
 import { RideRepository } from './ride.repository';
 import { Ride, RideStatus } from './domain/ride.model';
 import { UserService } from '../user/user.service';
+import { VehicleService } from 'src/vehicle/vehicle.service';
 
 @Injectable()
 export class RideService {
   constructor(
     private readonly rideRepository: RideRepository,
     private readonly userService: UserService,
+    private readonly vehicleService: VehicleService,
     @Inject('RIDE_SERVICE') private readonly kafkaClient: ClientKafka,
   ) {}
 
@@ -135,5 +137,27 @@ export class RideService {
 
   async getCompletedRidesForDriver(driverId: string) {
     return this.rideRepository.findCompletedRidesForDriver(driverId);
+  }
+
+  async getVehicleForRide(rideId: string) {
+    const ride = await this.rideRepository.findById(rideId);
+    if (!ride) throw new NotFoundException('Ride not found');
+
+    if (!ride.driverId)
+      throw new NotFoundException('Ride has no assigned driver yet');
+
+    const vehicle = await this.vehicleService.getActiveVehicleForDriver(
+      ride.driverId,
+    );
+    if (!vehicle) throw new NotFoundException('Driver has no active vehicle');
+
+    return {
+      make: vehicle.make,
+      model: vehicle.model,
+      licensePlate: vehicle.licensePlate,
+      color: vehicle.color,
+      driverId: ride.driverId,
+      rideId: ride.id,
+    };
   }
 }

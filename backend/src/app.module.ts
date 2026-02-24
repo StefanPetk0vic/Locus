@@ -15,6 +15,8 @@ import { ReviewController } from './review/review.controller';
 import { ReviewService } from './review/review.service';
 import { ReviewModule } from './review/review.module';
 import { ReviewEntity } from './review/infrastructure/review.entity';
+import { VehicleModule } from './vehicle/vehicle.module';
+import { VehicleEntity } from './vehicle/infrastructure/vehicle.entity';
 
 @Module({
   imports: [
@@ -32,7 +34,14 @@ import { ReviewEntity } from './review/infrastructure/review.entity';
         username: configService.get('DB_USERNAME') ?? 'elfak',
         password: configService.get('DB_PASSWORD') ?? 'locus123',
         database: configService.get('DB_NAME') ?? 'locus',
-        entities: [User, Driver, Rider, RideEntity, ReviewEntity],
+        entities: [
+          User,
+          Driver,
+          Rider,
+          RideEntity,
+          ReviewEntity,
+          VehicleEntity,
+        ],
         synchronize: true,
       }),
     }),
@@ -41,6 +50,7 @@ import { ReviewEntity } from './review/infrastructure/review.entity';
     RideModule,
     RedisModule,
     ReviewModule,
+    VehicleModule,
   ],
   controllers: [AppController],
   providers: [AppService],
