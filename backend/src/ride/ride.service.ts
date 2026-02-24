@@ -185,7 +185,7 @@ export class RideService {
       driverId: ride.driverId,
       rideId: ride.id,
     };
-  
+  }
 
   async storeBatches(rideId: string, batches: string[][]): Promise<void> {
     await this.redisService.set(`ride:batches:${rideId}`, batches, BATCH_TTL_SECONDS);
