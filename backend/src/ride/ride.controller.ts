@@ -9,6 +9,7 @@ import {
   Inject,
   Logger,
   Get,
+  NotFoundException,
 } from '@nestjs/common';
 import { ClientKafka, EventPattern, Payload } from '@nestjs/microservices';
 import { RideService } from './ride.service';
@@ -193,5 +194,15 @@ export class RideController implements OnModuleInit {
       console.log(user.role);
       return this.rideService.getCompletedRidesForRider(user.id);
     }
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('/:id/vehicle')
+  async getVehicleForRide(@Param('id') rideId: string, @GetUser() user: User) {
+    const ride = await this.rideService.findRideById(rideId);
+    if (!ride) throw new NotFoundException('Ride not found');
+    if (ride.riderId !== user.id)
+      throw new NotFoundException('You are not the rider for this ride');
+    return this.rideService.getVehicleForRide(rideId);
   }
 }
