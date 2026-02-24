@@ -14,6 +14,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserRole } from '../user/infrastructure/user.entity';
 import { RideRepository } from './ride.repository';
+import { RideService } from './ride.service';
 
 
 interface AuthenticatedSocket extends Socket {
@@ -32,14 +33,15 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(RideGateway.name);
   private driverSockets = new Map<string, string>(); 
   private riderSockets = new Map<string, string>(); 
-
   private lastLocationUpdate = new Map<string, number>();
+  private batchTimeouts = new Map<string, NodeJS.Timeout>();
 
   constructor(
     private jwtService: JwtService,
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private readonly rideRepository: RideRepository,
+    private readonly rideService: RideService,
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -127,13 +129,56 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  notifyDriversAboutNewRide(rideData: any) {
-    this.logger.log(`Notifying all drivers about new ride: ${rideData.rideId}`);
-    this.logger.log(`Connected drivers count: ${this.driverSockets.size}`);
-    this.logger.log(`Connected riders count: ${this.riderSockets.size}`);
-    
-    this.server.to('drivers').emit('ride.requested', rideData);
-    this.logger.log('Sent to drivers room');
+  async notifyBatchOfDrivers(rideData: any, driverIds: string[], rideId: string) {
+    let notifiedCount = 0;
+
+    for (const driverId of driverIds) {
+      const socketId = this.driverSockets.get(driverId);
+      if (socketId) {
+        this.server.to(socketId).emit('ride.requested', rideData);
+        notifiedCount++;
+        this.logger.log(`[Batch] Notified driver ${driverId} about ride ${rideId}`);
+      }
+    }
+
+    this.logger.log(`[Batch] Notified ${notifiedCount}/${driverIds.length} online drivers for ride ${rideId}`);
+
+    if (notifiedCount > 0) {
+      this.scheduleBatchTimeout(rideId, rideData);
+    } else {
+      // None in this batch are online — skip to next immediately
+      this.logger.warn(`[Batch] No online drivers in batch for ride ${rideId}, advancing...`);
+      const nextBatch = await this.rideService.advanceBatch(rideId);
+      if (nextBatch && nextBatch.length > 0) {
+        await this.notifyBatchOfDrivers(rideData, nextBatch, rideId);
+      } else {
+        this.logger.warn(`[Batch] No more driver batches for ride ${rideId}`);
+      }
+    }
+  }
+
+  cancelBatchTimeout(rideId: string) {
+    const timeout = this.batchTimeouts.get(rideId);
+    if (timeout) {
+      clearTimeout(timeout);
+      this.batchTimeouts.delete(rideId);
+      this.logger.log(`[Batch] Cancelled timeout for ride ${rideId}`);
+    }
+  }
+
+  private scheduleBatchTimeout(rideId: string, rideData: any) {
+    this.cancelBatchTimeout(rideId);
+    const timeout = setTimeout(async () => {
+      this.batchTimeouts.delete(rideId);
+      this.logger.log(`[Batch] Timeout expired for ride ${rideId}, moving to next batch`);
+      const nextBatch = await this.rideService.advanceBatch(rideId);
+      if (nextBatch && nextBatch.length > 0) {
+        await this.notifyBatchOfDrivers(rideData, nextBatch, rideId);
+      } else {
+        this.logger.warn(`[Batch] No more batches for ride ${rideId}, ride unmatched`);
+      }
+    }, 15_000);
+    this.batchTimeouts.set(rideId, timeout);
   }
 
   notifyRiderAboutAcceptedRide(riderId: string, rideData: any) {

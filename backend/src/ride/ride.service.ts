@@ -3,12 +3,19 @@ import { ClientKafka } from '@nestjs/microservices';
 import { RideRepository } from './ride.repository';
 import { Ride, RideStatus } from './domain/ride.model';
 import { UserService } from '../user/user.service';
+import { RedisService } from '../redis/redis.service';
+
+const BATCH_SIZE = 5;
+const MAX_DRIVERS = 15;    // 3 batches
+const NEARBY_RADIUS_KM = 10;
+const BATCH_TTL_SECONDS = 300;
 
 @Injectable()
 export class RideService {
   constructor(
     private readonly rideRepository: RideRepository,
     private readonly userService: UserService,
+    private readonly redisService: RedisService,
     @Inject('RIDE_SERVICE') private readonly kafkaClient: ClientKafka,
   ) {}
 
@@ -30,6 +37,23 @@ export class RideService {
     );
 
     const savedRide = await this.rideRepository.save(newRide);
+
+    // Find nearby drivers and store batches BEFORE emitting to Kafka
+    const nearbyDriverIds = await this.redisService.georadiusNearby(
+      'drivers:active',
+      pickupLng,
+      pickupLat,
+      NEARBY_RADIUS_KM,
+      'km',
+      MAX_DRIVERS,
+    );
+
+    const batches: string[][] = [];
+    for (let i = 0; i < nearbyDriverIds.length; i += BATCH_SIZE) {
+      batches.push(nearbyDriverIds.slice(i, i + BATCH_SIZE));
+    }
+
+    await this.storeBatches(savedRide.id, batches);
 
     this.kafkaClient.emit('ride.requested', {
       id: savedRide.id,
@@ -53,6 +77,8 @@ export class RideService {
     ride.assignDriver(driverId);
 
     const updatedRide = await this.rideRepository.save(ride);
+
+    await this.cleanupBatches(rideId);
 
     this.kafkaClient.emit('ride.accepted', {
       rideId,
@@ -135,5 +161,45 @@ export class RideService {
 
   async getCompletedRidesForDriver(driverId: string) {
     return this.rideRepository.findCompletedRidesForDriver(driverId);
+  }
+
+  // ─── Batch management ───────────────────────────────────────────────────────
+
+  async storeBatches(rideId: string, batches: string[][]): Promise<void> {
+    await this.redisService.set(`ride:batches:${rideId}`, batches, BATCH_TTL_SECONDS);
+    await this.redisService.set(`ride:batch:index:${rideId}`, 0, BATCH_TTL_SECONDS);
+  }
+
+  async getCurrentBatch(rideId: string): Promise<string[] | null> {
+    const batches = await this.redisService.get<string[][]>(`ride:batches:${rideId}`);
+    const index = await this.redisService.get<number>(`ride:batch:index:${rideId}`);
+    if (!batches || index === null || index >= batches.length) return null;
+    return batches[index];
+  }
+
+  async advanceBatch(rideId: string): Promise<string[] | null> {
+    const ride = await this.rideRepository.findById(rideId);
+    if (!ride || ride.status !== RideStatus.REQUESTED) {
+      await this.cleanupBatches(rideId);
+      return null;
+    }
+
+    const batches = await this.redisService.get<string[][]>(`ride:batches:${rideId}`);
+    const index = await this.redisService.get<number>(`ride:batch:index:${rideId}`);
+    if (!batches || index === null) return null;
+
+    const nextIndex = index + 1;
+    if (nextIndex >= batches.length) {
+      await this.cleanupBatches(rideId);
+      return null;
+    }
+
+    await this.redisService.set(`ride:batch:index:${rideId}`, nextIndex, BATCH_TTL_SECONDS);
+    return batches[nextIndex];
+  }
+
+  async cleanupBatches(rideId: string): Promise<void> {
+    await this.redisService.del(`ride:batches:${rideId}`);
+    await this.redisService.del(`ride:batch:index:${rideId}`);
   }
 }

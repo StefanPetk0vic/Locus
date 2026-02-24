@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Patch, Param, Body } from '@nestjs/common';
+import { Controller, Get, UseGuards, Patch, Param, Body, Post, ForbiddenException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { User } from './infrastructure/user.entity';
 import { GetUser } from '../auth/get-user.decorator';
@@ -75,5 +75,19 @@ export class UserController {
   async isFrequentRider(@Param('id') id: string) {
     const isFrequent = await this.userService.isFrequentRider(id);
     return { riderId: id, isFrequentRider: isFrequent };
+  }
+
+  @Post('/drivers/:id/update-location')
+  async updateDriverLocation(
+    @Param('id') id: string,
+    @GetUser() user: User,
+    @Body('longitude') longitude: number,
+    @Body('latitude') latitude: number,
+  ) {
+    if (user.id !== id) {
+      throw new ForbiddenException('You can only update your own location');
+    }
+    const updated = await this.userService.updateDriverLocation(id, longitude, latitude);
+    return { message: 'Location updated', updated };
   }
 }

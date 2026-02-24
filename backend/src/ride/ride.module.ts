@@ -10,11 +10,13 @@ import { RideController } from './ride.controller';
 import { RideGateway } from './ride.gateway';
 import { User } from '../user/infrastructure/user.entity';
 import { UserModule } from '../user/user.module';
+import { RedisModule } from '../redis/redis.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([RideEntity, User]),
     UserModule,
+    RedisModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
