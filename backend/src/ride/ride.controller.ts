@@ -143,19 +143,23 @@ export class RideController implements OnModuleInit {
   async handleRideRequested(@Payload() message: any) {
     this.logger.log('Nova voznja zatrazena:', message);
 
-    this.rideGateway.notifyDriversAboutNewRide({
+    const rideData = {
       rideId: message.id,
       riderId: message.riderId,
-      pickup: {
-        lat: message.pickupLat,
-        lng: message.pickupLng,
-      },
-      destination: {
-        lat: message.destinationLat,
-        lng: message.destinationLng,
-      },
+      pickup: { lat: message.pickupLat, lng: message.pickupLng },
+      destination: { lat: message.destinationLat, lng: message.destinationLng },
       timestamp: new Date(),
-    });
+    };
+
+    const firstBatch = await this.rideService.getCurrentBatch(message.id);
+
+    if (firstBatch && firstBatch.length > 0) {
+      this.logger.log(`Starting batch matching for ride ${message.id} with ${firstBatch.length} drivers`);
+      await this.rideGateway.notifyBatchOfDrivers(rideData, firstBatch, message.id);
+    } else {
+      this.logger.warn(`No nearby drivers found for ride ${message.id}, broadcasting to all`);
+      this.rideGateway.server.to('drivers').emit('ride.requested', rideData);
+    }
   }
 
   @EventPattern('ride.accepted')
@@ -168,6 +172,9 @@ export class RideController implements OnModuleInit {
       this.logger.error('ride.accepted payload missing riderId', payload);
       return;
     }
+
+    // Cancel the batch rotation timeout — ride is taken
+    this.rideGateway.cancelBatchTimeout(message.rideId);
 
     this.rideGateway.notifyRiderAboutAcceptedRide(message.riderId, {
       rideId: message.rideId,

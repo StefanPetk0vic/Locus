@@ -6,9 +6,10 @@ import { Driver } from './infrastructure/driver.entity';
 import { Rider } from './infrastructure/rider.entity';
 import { UserRepository } from './user.repository';
 import { UserService } from './user.service';
+import { RedisModule } from '../redis/redis.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Driver, Rider])],
+  imports: [TypeOrmModule.forFeature([User, Driver, Rider]), RedisModule],
   controllers: [UserController],
   providers: [UserRepository, UserService],
   exports: [TypeOrmModule, UserRepository, UserService],
