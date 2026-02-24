@@ -3,10 +3,14 @@ import { UserRepository } from './user.repository';
 import { User } from './domain/user.model';
 import { Driver } from './domain/driver.model';
 import { Rider } from './domain/rider.model';
+import Redis from 'ioredis';
+import { RedisService } from 'src/redis/redis.service';
 
 @Injectable()
 export class UserService {
-  constructor(private readonly userRepository: UserRepository) {}
+  constructor(private readonly userRepository: UserRepository, private readonly redisService: RedisService) {
+    this.redisService.ping().then((res) => console.log('Redis ping response:', res)).catch((err) => console.error('Redis ping error:', err));
+  }
 
   async getUserProfile(userId: string): Promise<User> {
     const user = await this.userRepository.findById(userId);
@@ -150,5 +154,16 @@ export class UserService {
     }
 
     return user.canAcceptRides();
+  }
+
+  async updateDriverLocation(driverId: string, longitude: number, latitude: number) {
+    const user = await this.userRepository.findById(driverId);
+    if (!user) {
+      throw new NotFoundException(`Driver with ID ${driverId} not found`);
+    }
+    if (!(user instanceof Driver)) {
+      throw new ConflictException('User is not a driver');
+    }
+    return this.redisService.geoadd('drivers:active', longitude, latitude, driverId);
   }
 }

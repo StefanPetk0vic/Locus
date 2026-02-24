@@ -54,4 +54,33 @@ export class RedisService implements OnModuleDestroy {
   get client(): Redis {
     return this.redis;
   }
-}
+
+  async geoadd(key: string, longitude: number, latitude: number, member: string): Promise<number> {
+    const current = await this.redis.geopos(key, member);
+    if (current && current[0]) {
+      const [curLon, curLat] = current[0];
+      if (parseFloat(curLon) === longitude && parseFloat(curLat) === latitude) {
+        return 0;
+      }
+    }
+    return await this.redis.geoadd(key, longitude, latitude, member);
+  }
+
+  async georadius(key: string, longitude: number, latitude: number, radius: number, unit: string) {
+    return await this.redis.georadius(key, longitude, latitude, radius, unit);
+  }
+
+  async georadiusNearby(
+    key: string,
+    longitude: number,
+    latitude: number,
+    radius: number,
+    unit: string,
+    count: number,
+  ): Promise<string[]> {
+    return (await this.redis.georadius(
+      key, longitude, latitude, radius, unit,
+      'ASC', 'COUNT', count,
+    )) as string[];
+  }
+
