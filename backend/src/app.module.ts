@@ -11,6 +11,10 @@ import { Rider } from './user/infrastructure/rider.entity';
 import { RideModule } from './ride/ride.module';
 import { RideEntity } from './ride/infrastructure/ride.entity';
 import { RedisModule } from './redis/redis.module';
+import { ReviewController } from './review/review.controller';
+import { ReviewService } from './review/review.service';
+import { ReviewModule } from './review/review.module';
+import { ReviewEntity } from './review/infrastructure/review.entity';
 
 @Module({
   imports: [
@@ -28,7 +32,7 @@ import { RedisModule } from './redis/redis.module';
         username: configService.get('DB_USERNAME') ?? 'elfak',
         password: configService.get('DB_PASSWORD') ?? 'locus123',
         database: configService.get('DB_NAME') ?? 'locus',
-        entities: [User, Driver, Rider, RideEntity],
+        entities: [User, Driver, Rider, RideEntity, ReviewEntity],
         synchronize: true,
       }),
     }),
@@ -36,6 +40,7 @@ import { RedisModule } from './redis/redis.module';
     UserModule,
     RideModule,
     RedisModule,
+    ReviewModule,
   ],
   controllers: [AppController],
   providers: [AppService],
