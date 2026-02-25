@@ -146,7 +146,6 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (notifiedCount > 0) {
       this.scheduleBatchTimeout(rideId, rideData);
     } else {
-      // None in this batch are online — skip to next immediately
       this.logger.warn(`[Batch] No online drivers in batch for ride ${rideId}, advancing...`);
       const nextBatch = await this.rideService.advanceBatch(rideId);
       if (nextBatch && nextBatch.length > 0) {

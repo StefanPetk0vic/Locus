@@ -6,6 +6,7 @@ import { Logger } from '@nestjs/common';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['log', 'error', 'warn', 'debug', 'verbose'],
+    rawBody: true, // enables req.rawBody for Stripe webhook signature verification
   });
 
   app.enableCors({

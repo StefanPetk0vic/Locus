@@ -46,4 +46,7 @@ export class RideEntity {
   @ManyToOne(() => Driver, { nullable: true })
   @JoinColumn({ name: 'driverId' })
   driver: Driver;
+
+  @Column({ nullable: true })
+  stripePaymentIntentId: string;
 }

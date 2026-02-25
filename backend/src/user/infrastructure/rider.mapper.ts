@@ -11,6 +11,8 @@ export class RiderMapper {
       entity.lastName,
       entity.rides,
       entity.isAdmin,
+      entity.stripeCustomerId ?? null,
+      entity.stripePaymentMethodId ?? null,
     );
   }
 
@@ -23,6 +25,8 @@ export class RiderMapper {
     entity.lastName = domain.lastName;
     entity.rides = domain.rides;
     entity.isAdmin = domain.isAdmin;
+    if (domain.stripeCustomerId) entity.stripeCustomerId = domain.stripeCustomerId;
+    if (domain.stripePaymentMethodId) entity.stripePaymentMethodId = domain.stripePaymentMethodId;
     return entity;
   }
 }

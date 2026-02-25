@@ -18,6 +18,7 @@ export class Ride {
     public driverId?: string | null,
     public price?: number,
     public createdAt?: Date,
+    public stripePaymentIntentId?: string | null,
   ) {}
 
   assignDriver(driverId: string) {

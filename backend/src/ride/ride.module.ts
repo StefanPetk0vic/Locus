@@ -12,6 +12,7 @@ import { User } from '../user/infrastructure/user.entity';
 import { UserModule } from '../user/user.module';
 import { VehicleModule } from 'src/vehicle/vehicle.module';
 import { RedisModule } from '../redis/redis.module';
+import { PaymentModule } from '../payment/payment.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { RedisModule } from '../redis/redis.module';
     UserModule,
     VehicleModule,
     RedisModule,
+    PaymentModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

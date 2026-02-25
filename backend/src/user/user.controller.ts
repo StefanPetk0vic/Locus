@@ -1,6 +1,7 @@
 import { Controller, Get, UseGuards, Patch, Param, Body, Post, ForbiddenException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { User } from './infrastructure/user.entity';
+import { Rider } from './infrastructure/rider.entity';
 import { GetUser } from '../auth/get-user.decorator';
 import { AdminGuard } from '../auth/admin.guard';
 import { UserService } from './user.service';
@@ -12,7 +13,15 @@ export class UserController {
 
   @Get('/profile')
   getProfile(@GetUser() user: User) {
-    return user;
+    const profile: any = { ...user };
+    // Expose whether rider has a payment method without leaking Stripe IDs
+    if (user instanceof Rider) {
+      profile.hasPaymentMethod = !!user.stripePaymentMethodId;
+    }
+    delete profile.stripeCustomerId;
+    delete profile.stripePaymentMethodId;
+    delete profile.password;
+    return profile;
   }
 
   @Patch('/:id/ban')

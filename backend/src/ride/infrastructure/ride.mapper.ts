@@ -14,6 +14,7 @@ export class RideMapper {
       entity.driverId,
       entity.price ? Number(entity.price) : undefined,
       entity.createdAt,
+      entity.stripePaymentIntentId ?? null,
     );
   }
 
@@ -28,6 +29,7 @@ export class RideMapper {
     entity.riderId = domain.riderId;
     if (domain.driverId) entity.driverId = domain.driverId;
     if (domain.price) entity.price = domain.price;
+    if (domain.stripePaymentIntentId) entity.stripePaymentIntentId = domain.stripePaymentIntentId;
     return entity;
   }
 }

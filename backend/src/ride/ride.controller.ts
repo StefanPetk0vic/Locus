@@ -47,6 +47,7 @@ export class RideController implements OnModuleInit {
       pickupLng: number;
       destLat: number;
       destLng: number;
+      price?: number;
     },
     @GetUser() user: User,
   ) {
@@ -57,6 +58,7 @@ export class RideController implements OnModuleInit {
       body.pickupLng,
       body.destLat,
       body.destLng,
+      body.price,
     );
   }
 
@@ -173,7 +175,6 @@ export class RideController implements OnModuleInit {
       return;
     }
 
-    // Cancel the batch rotation timeout — ride is taken
     this.rideGateway.cancelBatchTimeout(message.rideId);
 
     this.rideGateway.notifyRiderAboutAcceptedRide(message.riderId, {

@@ -17,6 +17,9 @@ import { ReviewModule } from './review/review.module';
 import { ReviewEntity } from './review/infrastructure/review.entity';
 import { VehicleModule } from './vehicle/vehicle.module';
 import { VehicleEntity } from './vehicle/infrastructure/vehicle.entity';
+import { PaymentModule } from './payment/payment.module';
+import { InvoiceEntity } from './payment/infrastructure/invoice.entity';
+import { ProcessedEventEntity } from './payment/infrastructure/processed-event.entity';
 
 @Module({
   imports: [
@@ -41,6 +44,8 @@ import { VehicleEntity } from './vehicle/infrastructure/vehicle.entity';
           RideEntity,
           ReviewEntity,
           VehicleEntity,
+          InvoiceEntity,
+          ProcessedEventEntity,
         ],
         synchronize: true,
       }),
@@ -51,6 +56,7 @@ import { VehicleEntity } from './vehicle/infrastructure/vehicle.entity';
     RedisModule,
     ReviewModule,
     VehicleModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

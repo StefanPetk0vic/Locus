@@ -1,10 +1,11 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ClientKafka } from '@nestjs/microservices';
 import { RideRepository } from './ride.repository';
 import { Ride, RideStatus } from './domain/ride.model';
 import { UserService } from '../user/user.service';
 import { VehicleService } from 'src/vehicle/vehicle.service';
 import { RedisService } from '../redis/redis.service';
+import { PaymentService } from '../payment/payment.service';
 
 const BATCH_SIZE = 5;
 const MAX_DRIVERS = 15;    // 3 batches
@@ -18,6 +19,7 @@ export class RideService {
     private readonly userService: UserService,
     private readonly vehicleService: VehicleService,
     private readonly redisService: RedisService,
+    private readonly paymentService: PaymentService,
     @Inject('RIDE_SERVICE') private readonly kafkaClient: ClientKafka,
   ) {}
 
@@ -27,15 +29,39 @@ export class RideService {
     pickupLng: number,
     destLat: number,
     destLng: number,
+    price?: number,
   ) {
+    // Calculate price if not provided
+    const ridePrice = price ?? this.calculatePrice(pickupLat, pickupLng, destLat, destLng);
+
+    const rideId = crypto.randomUUID();
+
+    // Pre-authorize payment — will throw if card declined / insufficient funds
+    let paymentIntentId: string | null = null;
+    try {
+      paymentIntentId = await this.paymentService.authorizeRidePayment(
+        riderId,
+        rideId,
+        ridePrice,
+      );
+    } catch (err) {
+      throw new BadRequestException(
+        err.message || 'Payment authorization failed. Please check your card.',
+      );
+    }
+
     const newRide = new Ride(
-      crypto.randomUUID(),
+      rideId,
       pickupLat,
       pickupLng,
       destLat,
       destLng,
       RideStatus.REQUESTED,
       riderId,
+      null,
+      ridePrice,
+      undefined,
+      paymentIntentId,
     );
 
     const savedRide = await this.rideRepository.save(newRide);
@@ -127,6 +153,9 @@ export class RideService {
 
     const updatedRide = await this.rideRepository.save(ride);
 
+    // Cancel the pre-authorized payment
+    await this.paymentService.cancelRidePayment(rideId);
+
     this.kafkaClient.emit('ride.cancelled', {
       rideId,
       riderId: ride.riderId,
@@ -147,11 +176,21 @@ export class RideService {
 
     await this.userService.incrementRiderRideCount(ride.riderId);
 
+    // Capture the pre-authorized payment
+    let paymentStatus = 'success';
+    try {
+      const invoice = await this.paymentService.captureRidePayment(rideId);
+      paymentStatus = invoice.status;
+    } catch (err) {
+      paymentStatus = 'failed';
+    }
+
     this.kafkaClient.emit('ride.completed', {
       rideId,
       riderId: ride.riderId,
       driverId: ride.driverId,
       status: updatedRide.status,
+      paymentStatus,
     });
 
     return updatedRide;
@@ -190,6 +229,28 @@ export class RideService {
   async storeBatches(rideId: string, batches: string[][]): Promise<void> {
     await this.redisService.set(`ride:batches:${rideId}`, batches, BATCH_TTL_SECONDS);
     await this.redisService.set(`ride:batch:index:${rideId}`, 0, BATCH_TTL_SECONDS);
+  }
+
+  /**
+   * Calculate ride price using the Haversine distance.
+   * Formula: 150 RSD base + 100 RSD per km
+   */
+  private calculatePrice(
+    pickupLat: number,
+    pickupLng: number,
+    destLat: number,
+    destLng: number,
+  ): number {
+    const R = 6371000; // Earth radius in metres
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const dLat = toRad(destLat - pickupLat);
+    const dLng = toRad(destLng - pickupLng);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(pickupLat)) * Math.cos(toRad(destLat)) * Math.sin(dLng / 2) ** 2;
+    const distanceMeters = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const km = distanceMeters / 1000;
+    return Math.round(150 + 100 * km);
   }
 
   async getCurrentBatch(rideId: string): Promise<string[] | null> {

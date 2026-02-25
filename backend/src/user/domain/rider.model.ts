@@ -9,6 +9,8 @@ export class Rider extends User {
     lastName: string,
     public rides: number = 0,
     isAdmin: boolean = false,
+    public stripeCustomerId: string | null = null,
+    public stripePaymentMethodId: string | null = null,
   ) {
     super(id, email, password, firstName, lastName, UserRole.RIDER, isAdmin);
   }

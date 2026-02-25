@@ -27,6 +27,8 @@ export class UserMapper {
         entity.lastName,
         entity.rides,
         entity.isAdmin,
+        entity.stripeCustomerId ?? null,
+        entity.stripePaymentMethodId ?? null,
       );
     }
     throw new Error('Unknown user entity type');
@@ -53,6 +55,8 @@ export class UserMapper {
       entity.lastName = domain.lastName;
       entity.rides = domain.rides;
       entity.isAdmin = domain.isAdmin;
+      if (domain.stripeCustomerId) entity.stripeCustomerId = domain.stripeCustomerId;
+      if (domain.stripePaymentMethodId) entity.stripePaymentMethodId = domain.stripePaymentMethodId;
       return entity;
     }
     throw new Error('Unknown user domain type');
