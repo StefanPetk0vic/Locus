@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { MapPin, Navigation2, DollarSign, CreditCard } from 'lucide-react-native';
+import { MapPin, Navigation2, DollarSign, CreditCard, User, Car, Hash } from 'lucide-react-native';
 import Modal from './Modal';
 import Button from './Button';
+import UserRatingBadge from './UserRatingBadge';
 import { Colors, Typography, Spacing, BorderRadius } from '../config/theme';
 import { useRideStore } from '../store/rideStore';
 import { useAuthStore } from '../store/authStore';
+import { rideApi, DriverInfoResponse } from '../services/api';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
-  
   onDriverMatched?: () => void;
   pickupLat: number;
   pickupLng: number;
@@ -18,9 +19,7 @@ interface Props {
   destLng: number;
   pickupLabel?: string;
   destLabel?: string;
-  
   price?: number;
-  
   distanceKm?: number;
 }
 
@@ -41,8 +40,11 @@ export default function RideRequestModal({
   const user = useAuthStore((s) => s.user);
   const [requested, setRequested] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [driverInfo, setDriverInfo] = useState<DriverInfoResponse | null>(null);
+  const [loadingDriverInfo, setLoadingDriverInfo] = useState(false);
 
   const hasPaymentMethod = user?.role === 'RIDER' ? !!user?.hasPaymentMethod : true;
+  const driverMatched = !!(requested && currentRide?.driverId);
 
   const handleRequest = async () => {
     if (!hasPaymentMethod) {
@@ -64,24 +66,49 @@ export default function RideRequestModal({
   };
 
   const handleClose = () => {
+    if (driverMatched) {
+      // Transition to the tracking view instead of blocking
+      setRequested(false);
+      setDriverInfo(null);
+      onDriverMatched?.();
+      return;
+    }
     setRequested(false);
     setError(null);
+    setDriverInfo(null);
     onClose();
   };
-  
+
   useEffect(() => {
-    if (requested && currentRide?.driverId) {
+    if (driverMatched && currentRide?.id && !driverInfo) {
+      setLoadingDriverInfo(true);
+      rideApi
+        .getDriverInfoForRide(currentRide.id)
+        .then((res) => setDriverInfo(res.data))
+        .catch(() => {})
+        .finally(() => setLoadingDriverInfo(false));
+    }
+  }, [driverMatched, currentRide?.id]);
+
+  useEffect(() => {
+    if (driverMatched && driverInfo) {
       const timer = setTimeout(() => {
         setRequested(false);
+        setDriverInfo(null);
         onDriverMatched?.();
-      }, 1200); 
+      }, 3500);
       return () => clearTimeout(timer);
     }
-  }, [currentRide?.driverId, requested]);
+  }, [driverMatched, driverInfo]);
 
   return (
-    <Modal visible={visible} onClose={handleClose} title="Confirm Ride">
-      {}
+    <Modal
+      visible={visible}
+      onClose={handleClose}
+      title={driverMatched ? 'Driver Found!' : 'Confirm Ride'}
+      closable={true}
+    >
+      {/* Route info */}
       <View style={styles.routeCard}>
         <View style={styles.routeRow}>
           <View style={[styles.dot, { backgroundColor: Colors.primary }]} />
@@ -102,7 +129,6 @@ export default function RideRequestModal({
         </View>
       </View>
 
-      {}
       <View style={styles.priceRow}>
         <DollarSign size={18} color={price ? Colors.text : Colors.textSecondary} />
         {price ? (
@@ -115,29 +141,90 @@ export default function RideRequestModal({
         )}
       </View>
 
-      {}
-      {requested && !currentRide?.driverId ? (
+      {driverMatched ? (
+        <View style={styles.driverInfoSection}>
+          <View style={styles.driverMatchedBanner}>
+            <Navigation2 size={20} color={Colors.success} />
+            <Text style={styles.driverMatchedText}>Your driver is on the way!</Text>
+          </View>
+
+          {loadingDriverInfo ? (
+            <View style={styles.loadingDriverRow}>
+              <ActivityIndicator color={Colors.primary} size="small" />
+              <Text style={styles.loadingDriverText}>Loading driver details...</Text>
+            </View>
+          ) : driverInfo ? (
+            <View style={styles.driverCard}>
+              <View style={styles.driverRow}>
+                <View style={styles.driverAvatar}>
+                  <User size={22} color={Colors.surface} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.driverName}>
+                    {driverInfo.firstName} {driverInfo.lastName}
+                  </Text>
+                  <UserRatingBadge userId={driverInfo.driverId} compact />
+                </View>
+              </View>
+
+              {/* Vehicle info */}
+              {driverInfo.vehicle && (
+                <View style={styles.vehicleSection}>
+                  <View style={styles.vehicleRow}>
+                    <Car size={16} color={Colors.textSecondary} />
+                    <Text style={styles.vehicleText}>
+                      {driverInfo.vehicle.color} {driverInfo.vehicle.make} {driverInfo.vehicle.model}
+                    </Text>
+                  </View>
+                  <View style={styles.vehicleRow}>
+                    <Hash size={16} color={Colors.textSecondary} />
+                    <Text style={styles.plateText}>{driverInfo.vehicle.licensePlate}</Text>
+                  </View>
+                </View>
+              )}
+            </View>
+          ) : null}
+        </View>
+      ) : requested && !currentRide?.driverId ? (
         <View style={styles.waitingContainer}>
           <ActivityIndicator color={Colors.primary} size="small" />
           <Text style={styles.waitingText}>Looking for a driver nearby...</Text>
+          <Button
+            title="Cancel Request"
+            variant="outline"
+            onPress={() => {
+              setRequested(false);
+              setError(null);
+              setDriverInfo(null);
+              onClose();
+            }}
+            style={{ marginTop: Spacing.md }}
+          />
         </View>
-      ) : currentRide?.driverId ? (
-        <View style={styles.matchedContainer}>
-          <Navigation2 size={20} color={Colors.success} />
-          <Text style={styles.matchedText}>Driver is on the way!</Text>
-        </View>      ) : !hasPaymentMethod ? (
+      ) : !hasPaymentMethod ? (
         <View style={styles.noPaymentContainer}>
           <CreditCard size={20} color={Colors.secondary} />
           <Text style={styles.noPaymentText}>
             Add a payment method in Profile → Payment Settings before requesting a ride.
           </Text>
-        </View>      ) : (
-        <Button
-          title="Request Ride"
-          onPress={handleRequest}
-          loading={isRequesting}
-          icon={<MapPin size={18} color="#fff" />}
-        />
+        </View>
+      ) : (
+        /* Initial state — confirm or cancel */
+        <View style={styles.actionsRow}>
+          <Button
+            title="Cancel"
+            variant="outline"
+            onPress={handleClose}
+            style={{ flex: 1 }}
+          />
+          <Button
+            title="Confirm Ride"
+            onPress={handleRequest}
+            loading={isRequesting}
+            icon={<Navigation2 size={18} color="#fff" />}
+            style={{ flex: 2 }}
+          />
+        </View>
       )}
     </Modal>
   );
@@ -202,18 +289,24 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginLeft: 'auto' as any,
   },
-  waitingContainer: {
+  actionsRow: {
     flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  waitingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.sm,
     paddingVertical: Spacing.md,
   },
   waitingText: {
     ...Typography.callout,
     color: Colors.textSecondary,
+    marginTop: Spacing.sm,
   },
-  matchedContainer: {
+  driverInfoSection: {
+    gap: Spacing.md,
+  },
+  driverMatchedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -222,10 +315,66 @@ const styles = StyleSheet.create({
     backgroundColor: '#E8F9EE',
     borderRadius: BorderRadius.md,
   },
-  matchedText: {
+  driverMatchedText: {
     ...Typography.callout,
     color: Colors.success,
     fontFamily: 'Inter_600SemiBold',
+  },
+  loadingDriverRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+  },
+  loadingDriverText: {
+    ...Typography.footnote,
+    color: Colors.textSecondary,
+  },
+  driverCard: {
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    gap: Spacing.md,
+  },
+  driverRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  driverAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  driverName: {
+    ...Typography.headline,
+    color: Colors.text,
+    marginBottom: 2,
+  },
+  vehicleSection: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingTop: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  vehicleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  vehicleText: {
+    ...Typography.subhead,
+    color: Colors.text,
+  },
+  plateText: {
+    ...Typography.headline,
+    color: Colors.text,
+    fontSize: 16,
+    letterSpacing: 1,
   },
   noPaymentContainer: {
     flexDirection: 'row',

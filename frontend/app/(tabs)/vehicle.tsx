@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Plus, Warehouse } from 'lucide-react-native';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { vehicleApi, VehicleResponse } from '../../src/services/api';
 import VehicleCard, { VehicleItem } from '../../src/components/VehicleCard';
@@ -119,7 +119,7 @@ export default function VehicleScreen() {
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
-              <Animated.View entering={FadeInDown.duration(400)} style={styles.empty}>
+              <View style={styles.empty}>
                 <View style={styles.emptyIcon}>
                   <Warehouse size={48} color={G.border} strokeWidth={1.2} />
                 </View>
@@ -135,7 +135,7 @@ export default function VehicleScreen() {
                   <Plus size={18} color={G.bg} />
                   <Text style={styles.emptyAddText}>Add Vehicle</Text>
                 </TouchableOpacity>
-              </Animated.View>
+              </View>
             }
           />
         )}

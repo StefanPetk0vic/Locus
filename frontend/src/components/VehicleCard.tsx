@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Car, Hash, Palette, CheckCircle2, Trash2 } from 'lucide-react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Spacing, BorderRadius, Typography } from '../config/theme';
 
 /* soft-black pastel palette for Garage */
@@ -36,7 +35,7 @@ interface Props {
 
 export default function VehicleCard({ vehicle, index, onActivate, onDelete }: Props) {
   return (
-    <Animated.View entering={FadeInDown.delay(index * 80).duration(350)} style={styles.card}>
+    <View style={styles.card}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.iconWrap}>
@@ -84,7 +83,7 @@ export default function VehicleCard({ vehicle, index, onActivate, onDelete }: Pr
           <Trash2 size={16} color={G.danger} />
         </TouchableOpacity>
       </View>
-    </Animated.View>
+    </View>
   );
 }
 

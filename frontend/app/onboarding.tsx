@@ -10,12 +10,13 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MapPin, Shield, Navigation } from 'lucide-react-native';
-import Animated, { FadeInUp } from 'react-native-reanimated';
 import OnboardingSlide from '../src/components/OnboardingSlide';
 import Button from '../src/components/Button';
 import { useAuthStore } from '../src/store/authStore';
-import { Colors, Spacing, Typography, BorderRadius } from '../src/config/theme';
-const { width } = Dimensions.get('window');
+import { Colors, Spacing, Typography, BorderRadius } from '../src/config/theme';
+
+const { width } = Dimensions.get('window');
+
 const slides = [
   {
     key: '1',
@@ -35,26 +36,32 @@ const slides = [
     title: 'Safe and reliable',
     subtitle: 'All drivers are verified. Your safety is our top priority on every trip.',
   },
-];
+];
+
 export default function Onboarding() {
   const router = useRouter();
   const completeOnboarding = useAuthStore((s) => s.completeOnboarding);
   const flatListRef = useRef<FlatList>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / width);
     setCurrentIndex(idx);
-  };
+  };
+
   const handleNext = () => {
     if (currentIndex < slides.length - 1) {
       flatListRef.current?.scrollToIndex({ index: currentIndex + 1 });
     }
-  };
+  };
+
   const handleGetStarted = async () => {
     await completeOnboarding();
     router.replace('/(auth)/login');
-  };
-  const isLast = currentIndex === slides.length - 1;
+  };
+
+  const isLast = currentIndex === slides.length - 1;
+
   return (
     <View style={styles.container}>
       <FlatList
@@ -74,7 +81,8 @@ export default function Onboarding() {
             subtitle={item.subtitle}
           />
         )}
-      />
+      />
+
       {}
       <View style={styles.pagination}>
         {slides.map((_, i) => (
@@ -86,9 +94,10 @@ export default function Onboarding() {
             ]}
           />
         ))}
-      </View>
+      </View>
+
       {}
-      <Animated.View entering={FadeInUp.delay(400).duration(500)} style={styles.bottom}>
+      <View style={styles.bottom}>
         {isLast ? (
           <Button title="Get Started" onPress={handleGetStarted} />
         ) : (
@@ -97,10 +106,11 @@ export default function Onboarding() {
             <Button title="Next" onPress={handleNext} style={{ flex: 1 }} />
           </View>
         )}
-      </Animated.View>
+      </View>
     </View>
   );
-}
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,

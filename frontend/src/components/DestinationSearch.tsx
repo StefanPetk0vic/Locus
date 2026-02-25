@@ -11,25 +11,30 @@ import {
   StatusBar,
 } from 'react-native';
 import { ArrowLeft, MapPin, Navigation, X } from 'lucide-react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../config/theme';
+import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../config/theme';
+
 interface SearchResult {
   id: string;
   title: string;
   subtitle: string;
   lat: number;
   lng: number;
-}
+}
+
 interface DestinationSearchProps {
   visible: boolean;
   onClose: () => void;
   onSelect: (dest: { lat: number; lng: number; label: string }) => void;
   userLat?: number;
-  userLng?: number;  
-  title?: string;  
+  userLng?: number;
+  
+  title?: string;
+  
   placeholder?: string;
-}
-const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
+}
+
+const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
+
 export default function DestinationSearch({
   visible,
   onClose,
@@ -43,7 +48,8 @@ export default function DestinationSearch({
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (visible) {
       setTimeout(() => inputRef.current?.focus(), 300);
@@ -51,7 +57,8 @@ export default function DestinationSearch({
       setQuery('');
       setResults([]);
     }
-  }, [visible]);
+  }, [visible]);
+
   const search = async (text: string) => {
     if (text.length < 3) {
       setResults([]);
@@ -87,20 +94,25 @@ export default function DestinationSearch({
     } finally {
       setLoading(false);
     }
-  };
+  };
+
   const handleTextChange = (text: string) => {
     setQuery(text);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => search(text), 500);
-  };
+  };
+
   const handleSelect = (item: SearchResult) => {
     Keyboard.dismiss();
     onSelect({ lat: item.lat, lng: item.lng, label: item.title });
-  };
-  if (!visible) return null;
+  };
+
+  if (!visible) return null;
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="dark-content" />
+
       {}
       <View style={styles.header}>
         <TouchableOpacity onPress={onClose} style={styles.backBtn} activeOpacity={0.7}>
@@ -108,7 +120,8 @@ export default function DestinationSearch({
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{title}</Text>
         <View style={{ width: 40 }} />
-      </View>
+      </View>
+
       {}
       <View style={styles.inputContainer}>
         <View style={styles.inputRow}>
@@ -129,7 +142,8 @@ export default function DestinationSearch({
             </TouchableOpacity>
           )}
         </View>
-      </View>      
+      </View>
+      
       <TouchableOpacity
         style={styles.tapHint}
         activeOpacity={0.7}
@@ -139,7 +153,8 @@ export default function DestinationSearch({
       >
         <Navigation size={18} color={Colors.primary} />
         <Text style={styles.tapHintText}>Or tap on the map to set destination</Text>
-      </TouchableOpacity>      
+      </TouchableOpacity>
+      
       <FlatList
         data={results}
         keyExtractor={(item) => item.id}
@@ -151,7 +166,7 @@ export default function DestinationSearch({
           ) : null
         }
         renderItem={({ item, index }) => (
-          <Animated.View entering={FadeInDown.delay(index * 50).duration(200)}>
+          <View>
             <TouchableOpacity
               style={styles.resultRow}
               activeOpacity={0.7}
@@ -169,13 +184,15 @@ export default function DestinationSearch({
                 </Text>
               </View>
             </TouchableOpacity>
-          </Animated.View>
+          </View>
         )}
       />
     </View>
   );
-}
-const TOP_INSET = Platform.OS === 'ios' ? 56 : (StatusBar.currentHeight || 24) + 8;
+}
+
+const TOP_INSET = Platform.OS === 'ios' ? 56 : (StatusBar.currentHeight || 24) + 8;
+
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,

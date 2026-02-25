@@ -31,9 +31,6 @@ export class PaymentService {
     this.webhookSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET') || '';
   }
 
-  /* ──────────────────────────────────────────────
-   * 1. Add Payment Method (card token from frontend)
-   * ────────────────────────────────────────────── */
   async addPaymentMethod(riderId: string, cardToken: string) {
     const rider = await this.riderRepo.findOne({ where: { id: riderId } });
     if (!rider) throw new NotFoundException('Rider not found');
@@ -75,9 +72,6 @@ export class PaymentService {
     };
   }
 
-  /* ──────────────────────────────────────────────
-   * 2. Get saved payment method info
-   * ────────────────────────────────────────────── */
   async getPaymentMethod(riderId: string) {
     const rider = await this.riderRepo.findOne({ where: { id: riderId } });
     if (!rider) throw new NotFoundException('Rider not found');
@@ -100,9 +94,6 @@ export class PaymentService {
     }
   }
 
-  /* ──────────────────────────────────────────────
-   * 3. Remove payment method
-   * ────────────────────────────────────────────── */
   async removePaymentMethod(riderId: string) {
     const rider = await this.riderRepo.findOne({ where: { id: riderId } });
     if (!rider) throw new NotFoundException('Rider not found');
@@ -120,11 +111,7 @@ export class PaymentService {
     return { message: 'Payment method removed' };
   }
 
-  /* ──────────────────────────────────────────────
-   * 4. Pre-authorize (hold) funds for a ride
-   *    Returns the PaymentIntent ID
-   *    NOTE: Does NOT save the invoice — call saveRideInvoice() after the ride row exists.
-   * ────────────────────────────────────────────── */
+
   async authorizeRidePayment(
     riderId: string,
     rideId: string,
@@ -186,9 +173,6 @@ export class PaymentService {
     }
   }
 
-  /* ──────────────────────────────────────────────
-   * 4b. Persist the invoice AFTER the ride row exists in the DB
-   * ────────────────────────────────────────────── */
   async saveRideInvoice(
     invoiceId: string,
     rideId: string,
@@ -209,9 +193,7 @@ export class PaymentService {
     this.logger.log(`Invoice ${invoiceId} saved for ride ${rideId}`);
   }
 
-  /* ──────────────────────────────────────────────
-   * 5. Capture funds after ride completion
-   * ────────────────────────────────────────────── */
+
   async captureRidePayment(rideId: string): Promise<Invoice> {
     const invoice = await this.paymentRepository.findInvoiceByRideId(rideId);
     if (!invoice) {
@@ -247,9 +229,7 @@ export class PaymentService {
     return this.paymentRepository.saveInvoice(invoice);
   }
 
-  /* ──────────────────────────────────────────────
-   * 6. Cancel pre-authorization (ride cancelled)
-   * ────────────────────────────────────────────── */
+
   async cancelRidePayment(rideId: string): Promise<void> {
     const invoice = await this.paymentRepository.findInvoiceByRideId(rideId);
     if (!invoice || !invoice.stripePaymentIntentId) return;
@@ -270,17 +250,10 @@ export class PaymentService {
     }
   }
 
-  /* ──────────────────────────────────────────────
-   * 7. Get invoices for a user
-   * ────────────────────────────────────────────── */
   async getInvoicesForUser(userId: string): Promise<Invoice[]> {
     return this.paymentRepository.findInvoicesForUser(userId);
   }
 
-  /* ──────────────────────────────────────────────
-   * 8. Stripe Webhook handler
-   *    Handles idempotent event processing
-   * ────────────────────────────────────────────── */
   async handleWebhook(rawBody: Buffer, signature: string): Promise<void> {
     let event: Stripe.Event;
 

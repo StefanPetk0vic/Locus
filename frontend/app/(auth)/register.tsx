@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Mail, Lock, User, Car, ChevronLeft } from 'lucide-react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import Input from '../../src/components/Input';
 import Button from '../../src/components/Button';
 import { useAuthStore } from '../../src/store/authStore';
@@ -70,12 +69,12 @@ export default function Register() {
   if (!role) {
     return (
       <View style={styles.container}>
-        <Animated.View entering={FadeInDown.duration(500)} style={styles.roleHeader}>
+        <View style={styles.roleHeader}>
           <Text style={styles.title}>Join Locus</Text>
           <Text style={styles.subtitle}>How would you like to use the app?</Text>
-        </Animated.View>
+        </View>
 
-        <Animated.View entering={FadeInDown.delay(150).duration(500)} style={styles.roleCards}>
+        <View style={styles.roleCards}>
           <TouchableOpacity
             style={styles.roleCard}
             activeOpacity={0.7}
@@ -99,7 +98,7 @@ export default function Register() {
             <Text style={styles.roleTitle}>Driver</Text>
             <Text style={styles.roleDesc}>Earn money by driving passengers around</Text>
           </TouchableOpacity>
-        </Animated.View>
+        </View>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Already have an account?</Text>
@@ -131,15 +130,15 @@ export default function Register() {
         </TouchableOpacity>
 
         {}
-        <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
+        <View style={styles.header}>
           <Text style={styles.title}>
             Sign up as {role === 'RIDER' ? 'Rider' : 'Driver'}
           </Text>
           <Text style={styles.subtitle}>Create your account to get started</Text>
-        </Animated.View>
+        </View>
 
         {}
-        <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.form}>
+        <View style={styles.form}>
           <View style={styles.nameRow}>
             <Input
               label="First name"
@@ -200,7 +199,7 @@ export default function Register() {
             loading={loading}
             style={styles.button}
           />
-        </Animated.View>
+        </View>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Already have an account?</Text>

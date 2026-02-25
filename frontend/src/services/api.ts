@@ -32,7 +32,6 @@ api.interceptors.response.use(
   (error) => {
     const url = error.config?.url || '';
     console.log('[API] Error:', error.response?.status, error.message, url);
-    // Only auto-logout on 401 for profile fetch, not for ride requests
     if (error.response?.status === 401 && url.includes('/users/profile')) {
       storage.removeToken();
     }
@@ -102,6 +101,18 @@ export interface RideResponse {
   createdAt: string;
 }
 
+export interface DriverInfoResponse {
+  driverId: string;
+  firstName: string;
+  lastName: string;
+  vehicle: {
+    make: string;
+    model: string;
+    licensePlate: string;
+    color: string;
+  } | null;
+}
+
 export const rideApi = {
   requestRide: (data: RideRequest) =>
     api.post<RideResponse>('/rides/request', data),
@@ -119,6 +130,8 @@ export const rideApi = {
     api.get<RideResponse[]>('/rides/completed'),
   getVehicleForRide: (rideId: string) =>
     api.get<VehicleResponse>(`/rides/${rideId}/vehicle`),
+  getDriverInfoForRide: (rideId: string) =>
+    api.get<DriverInfoResponse>(`/rides/${rideId}/driver-info`),
 };
 
 /* ── Vehicle ── */

@@ -7,20 +7,22 @@ import { Colors, Typography, Spacing } from '../config/theme';
 interface Props {
   userId: string;
   compact?: boolean;
+  refreshKey?: number;
 }
 
-export default function UserRatingBadge({ userId, compact = false }: Props) {
+export default function UserRatingBadge({ userId, compact = false, refreshKey = 0 }: Props) {
   const [rating, setRating] = useState<RatingResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!userId) return;
+    setLoading(true);
     reviewApi
       .getAverageRating(userId)
       .then((res) => setRating(res.data))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [userId]);
+  }, [userId, refreshKey]);
 
   if (loading) {
     return <ActivityIndicator size="small" color={Colors.textSecondary} />;

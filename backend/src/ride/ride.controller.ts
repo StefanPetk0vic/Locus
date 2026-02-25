@@ -208,4 +208,14 @@ export class RideController implements OnModuleInit {
       throw new NotFoundException('You are not the rider for this ride');
     return this.rideService.getVehicleForRide(rideId);
   }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('/:id/driver-info')
+  async getDriverInfoForRide(@Param('id') rideId: string, @GetUser() user: User) {
+    const ride = await this.rideService.findRideById(rideId);
+    if (!ride) throw new NotFoundException('Ride not found');
+    if (ride.riderId !== user.id)
+      throw new NotFoundException('You are not the rider for this ride');
+    return this.rideService.getDriverInfoForRide(rideId);
+  }
 }

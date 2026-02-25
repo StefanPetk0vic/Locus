@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Mail, Lock, MapPin } from 'lucide-react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import Input from '../../src/components/Input';
 import Button from '../../src/components/Button';
 import { useAuthStore } from '../../src/store/authStore';
@@ -58,16 +57,16 @@ export default function Login() {
         keyboardShouldPersistTaps="handled"
       >
         {}
-        <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
+        <View style={styles.header}>
           <View style={styles.logoCircle}>
             <MapPin size={28} color={Colors.surface} strokeWidth={2.5} />
           </View>
           <Text style={styles.title}>Welcome back</Text>
           <Text style={styles.subtitle}>Sign in to continue your journey</Text>
-        </Animated.View>
+        </View>
 
         {}
-        <Animated.View entering={FadeInDown.delay(150).duration(500)} style={styles.form}>
+        <View style={styles.form}>
           <Input
             label="Email"
             placeholder="you@example.com"
@@ -96,15 +95,15 @@ export default function Login() {
             loading={loading}
             style={styles.button}
           />
-        </Animated.View>
+        </View>
 
         {}
-        <Animated.View entering={FadeInDown.delay(300).duration(500)} style={styles.footer}>
+        <View style={styles.footer}>
           <Text style={styles.footerText}>Don't have an account?</Text>
           <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
             <Text style={styles.footerLink}>Sign Up</Text>
           </TouchableOpacity>
-        </Animated.View>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );

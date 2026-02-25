@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -21,9 +21,10 @@ import {
   CreditCard,
   Receipt,
 } from 'lucide-react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuthStore } from '../../src/store/authStore';
 import Modal from '../../src/components/Modal';
 import Input from '../../src/components/Input';
@@ -48,8 +49,17 @@ export default function ProfileScreen() {
   const [showGarage, setShowGarage] = useState(false);
   const [showPaymentSetup, setShowPaymentSetup] = useState(false);
   const [showInvoices, setShowInvoices] = useState(false);
+  const [ratingKey, setRatingKey] = useState(0);
 
   const isDriver = user?.role === 'DRIVER';
+
+  // Re-fetch profile + bump rating key every time the tab is focused
+  useFocusEffect(
+    useCallback(() => {
+      fetchProfile();
+      setRatingKey((k) => k + 1);
+    }, [])
+  );
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -73,7 +83,7 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         {}
-        <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
+        <View style={styles.header}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
               {(user?.firstName?.[0] || '').toUpperCase()}
@@ -88,13 +98,13 @@ export default function ProfileScreen() {
           </View>
           {user?.id && (
             <View style={styles.ratingRow}>
-              <UserRatingBadge userId={user.id} />
+              <UserRatingBadge userId={user.id} refreshKey={ratingKey} />
             </View>
           )}
-        </Animated.View>
+        </View>
 
         {}
-        <Animated.View entering={FadeInDown.delay(100).duration(400)}>
+        <View>
           <Text style={styles.sectionTitle}>Account</Text>
           <View style={styles.card}>
             <ProfileRow
@@ -138,10 +148,10 @@ export default function ProfileScreen() {
               </>
             )}
           </View>
-        </Animated.View>
+        </View>
 
         {}
-        <Animated.View entering={FadeInDown.delay(200).duration(400)}>
+        <View>
           <Text style={styles.sectionTitle}>Settings</Text>
           <View style={styles.card}>
             <TouchableOpacity
@@ -163,10 +173,10 @@ export default function ProfileScreen() {
               <ChevronRight size={18} color={Colors.border} />
             </TouchableOpacity>
           </View>
-        </Animated.View>
+        </View>
 
         {/* Quick Access */}
-        <Animated.View entering={FadeInDown.delay(250).duration(400)}>
+        <View>
           <Text style={styles.sectionTitle}>Quick Access</Text>
           <View style={styles.card}>
             <TouchableOpacity style={styles.actionRow} onPress={() => setShowReviews(true)}>
@@ -201,7 +211,7 @@ export default function ProfileScreen() {
               </>
             )}
           </View>
-        </Animated.View>
+        </View>
 
         <Text style={styles.version}>Locus v1.0.0</Text>
       </ScrollView>

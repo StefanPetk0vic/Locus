@@ -9,7 +9,6 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { Receipt, ChevronDown, ChevronUp, X } from 'lucide-react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../config/theme';
 import { paymentApi, InvoiceResponse } from '../services/api';
@@ -67,7 +66,7 @@ function InvoiceCard({ invoice, index }: { invoice: DisplayInvoice; index: numbe
   });
 
   return (
-    <Animated.View entering={FadeInDown.delay(index * 60).duration(350)} style={styles.card}>
+    <View style={styles.card}>
       <TouchableOpacity
         style={styles.cardHeader}
         activeOpacity={0.7}
@@ -129,7 +128,7 @@ function InvoiceCard({ invoice, index }: { invoice: DisplayInvoice; index: numbe
           </View>
         </View>
       )}
-    </Animated.View>
+    </View>
   );
 }
 

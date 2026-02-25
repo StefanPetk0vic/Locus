@@ -86,7 +86,7 @@ export default function ReviewModal({ visible, onClose, rideId, onSubmitted }: P
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <Button title="Submit Review" onPress={handleSubmit} loading={loading} style={styles.submitBtn} />
+      <Button title="Leave a Review" onPress={handleSubmit} loading={loading} style={styles.submitBtn} />
 
       <TouchableOpacity onPress={handleSkip} style={styles.skipBtn} activeOpacity={0.7}>
         <Text style={styles.skipText}>Skip</Text>

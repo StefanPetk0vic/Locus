@@ -8,8 +8,8 @@ import {
   Alert,
   Dimensions,
 } from 'react-native';
-import { Search, LocateFixed, Navigation2, MapPin, CircleDot, X, Play, CheckCircle2, CarTaxiFront, Star } from 'lucide-react-native';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { Search, LocateFixed, Navigation2, MapPin, CircleDot, X, Play, CheckCircle2, CarTaxiFront, Star, User, Car, Hash } from 'lucide-react-native';
+
 import { useAuthStore } from '../../src/store/authStore';
 import { useLocationStore } from '../../src/store/locationStore';
 import { useRideStore } from '../../src/store/rideStore';
@@ -22,7 +22,7 @@ import ReviewsList from '../../src/components/ReviewsList';
 import UserRatingBadge from '../../src/components/UserRatingBadge';
 import { fetchRoute, LatLng, calculatePrice } from '../../src/utils/fetchRoute';
 import { reverseGeocode } from '../../src/utils/reverseGeocode';
-import { userApi } from '../../src/services/api';
+import { userApi, rideApi, DriverInfoResponse } from '../../src/services/api';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../src/config/theme';
 
 type Region = { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number };
@@ -76,6 +76,7 @@ export default function HomeScreen() {
   const [completedRideId, setCompletedRideId] = useState<string | null>(null);
   const [showDriverReviews, setShowDriverReviews] = useState(false);
   const [driverLocationAddr, setDriverLocationAddr] = useState<string>('');
+  const [driverInfo, setDriverInfo] = useState<DriverInfoResponse | null>(null);
 
   const rideActive = !!(currentRide && currentRide.status !== 'COMPLETED' && currentRide.status !== 'CANCELLED');
   const rideInProgress = currentRide?.status === 'IN_PROGRESS';
@@ -86,11 +87,9 @@ export default function HomeScreen() {
     return () => unlisten();
   }, []);
 
-  /* ── Driver: push location to server every 30s ── */
   useEffect(() => {
     if (!isDriver || !user?.id || !location) return;
 
-    // Send immediately on mount / location change
     userApi.updateDriverLocation(user.id, location.latitude, location.longitude).catch(() => {});
 
     const interval = setInterval(() => {
@@ -229,13 +228,23 @@ export default function HomeScreen() {
     );
   }, [driverLocation?.lat, driverLocation?.lng, rideInProgress, tracking]);
 
-  /* Resolve driver location to address */
   useEffect(() => {
     if (!driverLocation) return;
     reverseGeocode(driverLocation.lat, driverLocation.lng).then(setDriverLocationAddr);
   }, [driverLocation?.lat, driverLocation?.lng]);
 
-  /* When rider sees ride.completed, prompt review */
+  useEffect(() => {
+    if (!isDriver && currentRide?.driverId && currentRide?.id) {
+      rideApi
+        .getDriverInfoForRide(currentRide.id)
+        .then((res) => setDriverInfo(res.data))
+        .catch(() => {});
+    }
+    if (!currentRide?.driverId) {
+      setDriverInfo(null);
+    }
+  }, [isDriver, currentRide?.driverId, currentRide?.id, tracking]);
+
   useEffect(() => {
     if (!isDriver && currentRide?.status === 'COMPLETED' && tracking) {
       const rideId = currentRide.id;
@@ -248,6 +257,7 @@ export default function HomeScreen() {
         setPickup(null);
         setPickupLabel('My location');
         setRouteCoordinates([]);
+        setDriverInfo(null);
         clearRide();
       }, 1500);
     }
@@ -353,17 +363,7 @@ export default function HomeScreen() {
       />
 
       {}
-      <Animated.View entering={FadeInUp.delay(300).duration(400)} style={styles.topBar}>
-        <View style={styles.greetingRow}>
-          <View>
-            <Text style={styles.greeting}>
-              Hello, {user?.firstName || 'there'}
-            </Text>
-            <Text style={styles.greetingSub}>
-              {isDriver ? 'Ready to drive?' : 'Where are you going?'}
-            </Text>
-          </View>
-        </View>
+      <View style={styles.topBar}>
 
         {!isDriver && !rideActive && (
           <TouchableOpacity style={styles.searchBar} activeOpacity={0.7} onPress={() => setSearchMode('destination')}>
@@ -371,7 +371,7 @@ export default function HomeScreen() {
             <Text style={styles.searchPlaceholder}>{destLabel || 'Search destination'}</Text>
           </TouchableOpacity>
         )}
-      </Animated.View>
+      </View>
 
       {}
       <TouchableOpacity style={styles.locateBtn} onPress={centerOnUser} activeOpacity={0.8}>
@@ -380,8 +380,26 @@ export default function HomeScreen() {
 
       {}
       {destination && !isDriver && !showRideModal && !tracking && (
-        <Animated.View entering={FadeInDown.duration(350)} style={styles.bottomCard}>
-          {}
+        <View style={styles.bottomCard}>
+          {/* Close button */}
+          <TouchableOpacity
+            style={styles.dismissBtn}
+            onPress={() => {
+              setDestination(null);
+              setDestLabel(null);
+              setPickup(null);
+              setPickupLabel('My location');
+              setRouteCoordinates([]);
+              setRidePrice(undefined);
+              setRideDistanceKm(undefined);
+            }}
+            hitSlop={12}
+            activeOpacity={0.7}
+          >
+            <X size={20} color={Colors.textSecondary} />
+          </TouchableOpacity>
+
+          {/* Pickup */}
           <TouchableOpacity
             style={styles.routeRow}
             activeOpacity={0.7}
@@ -411,16 +429,16 @@ export default function HomeScreen() {
             </View>
           </TouchableOpacity>
 
-          {}
+          {/* Confirm ride button */}
           <TouchableOpacity
             style={styles.confirmBtn}
             onPress={handleConfirmDestination}
             activeOpacity={0.8}
           >
             <Navigation2 size={18} color="#fff" />
-            <Text style={styles.confirmText}>Request Ride</Text>
+            <Text style={styles.confirmText}>Continue to Ride Details</Text>
           </TouchableOpacity>
-        </Animated.View>
+        </View>
       )}
 
       {}
@@ -436,12 +454,19 @@ export default function HomeScreen() {
             setRouteCoordinates([]);
             setRidePrice(undefined);
             setRideDistanceKm(undefined);
+            setDriverInfo(null);
             clearRide();
           }}
           onDriverMatched={() => {
-            
             setShowRideModal(false);
             setTracking(true);
+            const ride = useRideStore.getState().currentRide;
+            if (ride?.id) {
+              rideApi
+                .getDriverInfoForRide(ride.id)
+                .then((res) => setDriverInfo(res.data))
+                .catch(() => {});
+            }
           }}
           pickupLat={pickup?.lat ?? location!.latitude}
           pickupLng={pickup?.lng ?? location!.longitude}
@@ -456,7 +481,7 @@ export default function HomeScreen() {
 
       {}
       {tracking && !isDriver && (
-        <Animated.View entering={FadeInDown.duration(350)} style={styles.trackingCard}>
+        <View style={styles.trackingCard}>
           <View style={styles.trackingHeader}>
             <CarTaxiFront size={20} color={Colors.secondary} />
             <Text style={styles.trackingTitle}>
@@ -466,26 +491,41 @@ export default function HomeScreen() {
                 ? 'Ride completed!'
                 : 'Driver is on the way'}
             </Text>
-            {currentRide?.status !== 'IN_PROGRESS' && currentRide?.status !== 'COMPLETED' && (
-              <TouchableOpacity
-                onPress={async () => {
-                  if (currentRide) {
-                    try { await cancelRide(currentRide.id); } catch {}
-                  }
-                  setTracking(false);
-                  setDestination(null);
-                  setDestLabel(null);
-                  setPickup(null);
-                  setPickupLabel('My location');
-                  setRouteCoordinates([]);
-                  clearRide();
-                }}
-                hitSlop={12}
-              >
-                <X size={18} color={Colors.textSecondary} />
-              </TouchableOpacity>
-            )}
           </View>
+
+          {/* Driver info card */}
+          {driverInfo && (
+            <View style={styles.driverInfoCard}>
+              <View style={styles.driverInfoRow}>
+                <View style={styles.driverAvatar}>
+                  <User size={20} color={Colors.surface} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.driverNameText}>
+                    {driverInfo.firstName} {driverInfo.lastName}
+                  </Text>
+                  {currentRide?.driverId && (
+                    <UserRatingBadge userId={currentRide.driverId} compact />
+                  )}
+                </View>
+              </View>
+              {driverInfo.vehicle && (
+                <View style={styles.vehicleInfoSection}>
+                  <View style={styles.vehicleInfoRow}>
+                    <Car size={14} color={Colors.textSecondary} />
+                    <Text style={styles.vehicleInfoText}>
+                      {driverInfo.vehicle.color} {driverInfo.vehicle.make} {driverInfo.vehicle.model}
+                    </Text>
+                  </View>
+                  <View style={styles.vehicleInfoRow}>
+                    <Hash size={14} color={Colors.textSecondary} />
+                    <Text style={styles.plateInfoText}>{driverInfo.vehicle.licensePlate}</Text>
+                  </View>
+                </View>
+              )}
+            </View>
+          )}
+
           {ridePrice && (
             <Text style={styles.trackingPrice}>{ridePrice} RSD</Text>
           )}
@@ -494,7 +534,7 @@ export default function HomeScreen() {
               {driverLocationAddr || 'Locating driver...'}
             </Text>
           )}
-          {!driverLocation && (
+          {!driverLocation && !driverInfo && (
             <Text style={styles.trackingSubtext}>Waiting for driver location...</Text>
           )}
 
@@ -513,7 +553,7 @@ export default function HomeScreen() {
           {/* When ride is completed, show review prompt */}
           {currentRide?.status === 'COMPLETED' && (
             <TouchableOpacity
-              style={[styles.confirmBtn, { marginTop: Spacing.md }]}
+              style={[styles.confirmBtn, { marginTop: Spacing.md, backgroundColor: Colors.primary }]}
               onPress={() => {
                 setCompletedRideId(currentRide.id);
                 setShowReviewModal(true);
@@ -523,15 +563,16 @@ export default function HomeScreen() {
                 setPickup(null);
                 setPickupLabel('My location');
                 setRouteCoordinates([]);
+                setDriverInfo(null);
                 clearRide();
               }}
               activeOpacity={0.8}
             >
               <Star size={18} color="#fff" />
-              <Text style={styles.confirmText}>Rate Your Ride</Text>
+              <Text style={styles.confirmText}>Leave a Review</Text>
             </TouchableOpacity>
           )}
-        </Animated.View>
+        </View>
       )}
 
       {}
@@ -545,7 +586,7 @@ export default function HomeScreen() {
 
       {}
       {isDriver && currentRide && currentRide.status !== 'COMPLETED' && currentRide.status !== 'CANCELLED' && (
-        <Animated.View entering={FadeInDown.duration(350)} style={styles.driverActionCard}>
+        <View style={styles.driverActionCard}>
           {currentRide.status === 'ACCEPTED' && !nearPickup && (
             <>
               <View style={styles.trackingHeader}>
@@ -615,7 +656,7 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </>
           )}
-        </Animated.View>
+        </View>
       )}
 
       {}
@@ -680,17 +721,22 @@ const styles = StyleSheet.create({
     left: Spacing.md,
     right: Spacing.md,
   },
-  greetingRow: {
+  greetingCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
     marginBottom: Spacing.sm,
+    ...Shadows.card,
   },
   greeting: {
-    ...Typography.title2,
+    ...Typography.title3,
     color: Colors.text,
   },
   greetingSub: {
-    ...Typography.subhead,
+    ...Typography.footnote,
     color: Colors.textSecondary,
     marginTop: 2,
   },
@@ -733,6 +779,18 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.xl,
     ...Shadows.modal,
   },
+  dismissBtn: {
+    position: 'absolute',
+    top: Spacing.md,
+    right: Spacing.md,
+    zIndex: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   routeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -772,7 +830,7 @@ const styles = StyleSheet.create({
   },
   confirmText: {
     ...Typography.headline,
-    color: Colors.primary,
+    color: '#FFFFFF',
     fontSize: 15,
   },
   errorBanner: {
@@ -850,5 +908,51 @@ const styles = StyleSheet.create({
     ...Typography.footnote,
     color: Colors.secondary,
     fontFamily: 'Inter_600SemiBold',
+  },
+  driverInfoCard: {
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginTop: Spacing.md,
+    gap: Spacing.sm,
+  },
+  driverInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  driverAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  driverNameText: {
+    ...Typography.headline,
+    color: Colors.text,
+    marginBottom: 2,
+  },
+  vehicleInfoSection: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingTop: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  vehicleInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  vehicleInfoText: {
+    ...Typography.subhead,
+    color: Colors.text,
+  },
+  plateInfoText: {
+    ...Typography.headline,
+    color: Colors.text,
+    fontSize: 15,
+    letterSpacing: 1,
   },
 });

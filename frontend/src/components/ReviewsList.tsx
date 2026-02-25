@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Star, MessageSquare, User } from 'lucide-react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import Modal from './Modal';
 import { Colors, Typography, Spacing, BorderRadius } from '../config/theme';
 import { reviewApi, ReviewResponse, RatingResponse } from '../services/api';
@@ -43,7 +42,7 @@ function ReviewCard({ review, index }: { review: ReviewResponse; index: number }
   });
 
   return (
-    <Animated.View entering={FadeInDown.delay(index * 60).duration(300)} style={styles.card}>
+    <View style={styles.card}>
       <View style={styles.cardHeader}>
         <View style={styles.avatarSmall}>
           <User size={14} color={Colors.textSecondary} />
@@ -56,7 +55,7 @@ function ReviewCard({ review, index }: { review: ReviewResponse; index: number }
       ) : (
         <Text style={styles.noComment}>No comment</Text>
       )}
-    </Animated.View>
+    </View>
   );
 }
 

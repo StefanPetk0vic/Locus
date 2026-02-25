@@ -9,7 +9,6 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Clock, Star } from 'lucide-react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Colors, Typography, Spacing, BorderRadius } from '../../src/config/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { rideApi, RideResponse, paymentApi, InvoiceResponse } from '../../src/services/api';
@@ -38,8 +37,7 @@ function RideCard({
   });
 
   return (
-    <Animated.View
-      entering={FadeInDown.delay(index * 80).duration(400)}
+    <View
       style={styles.card}
     >
       <View style={styles.cardHeader}>
@@ -85,7 +83,7 @@ function RideCard({
           <Text style={styles.reviewBtnText}>Review</Text>
         </TouchableOpacity>
       </View>
-    </Animated.View>
+    </View>
   );
 }
 

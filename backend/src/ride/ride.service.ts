@@ -10,7 +10,7 @@ import { PaymentService } from '../payment/payment.service';
 const BATCH_SIZE = 5;
 const MAX_DRIVERS = 15;    // 3 batches
 const NEARBY_RADIUS_KM = 10;
-const BATCH_TTL_SECONDS = 300;
+const BATCH_TTL_SECONDS = 15;
 
 @Injectable()
 export class RideService {
@@ -31,12 +31,10 @@ export class RideService {
     destLng: number,
     price?: number,
   ) {
-    // Calculate price if not provided
     const ridePrice = price ?? this.calculatePrice(pickupLat, pickupLng, destLat, destLng);
 
     const rideId = crypto.randomUUID();
 
-    // Pre-authorize payment — will throw if card declined / insufficient funds
     let paymentIntentId: string | null = null;
     let invoiceId: string | null = null;
     try {
@@ -69,7 +67,7 @@ export class RideService {
 
     const savedRide = await this.rideRepository.save(newRide);
 
-    // Save the invoice AFTER the ride exists (FK constraint)
+    // Save the invoice AFTER the ride exists
     if (invoiceId && paymentIntentId) {
       await this.paymentService.saveRideInvoice(
         invoiceId,
@@ -240,6 +238,34 @@ export class RideService {
     };
   }
 
+  async getDriverInfoForRide(rideId: string) {
+    const ride = await this.rideRepository.findById(rideId);
+    if (!ride) throw new NotFoundException('Ride not found');
+    if (!ride.driverId)
+      throw new NotFoundException('Ride has no assigned driver yet');
+
+    const driver = await this.userService.getUserProfile(ride.driverId);
+    let vehicle: { make: string; model: string; licensePlate: string; color: string } | null = null;
+    try {
+      const v = await this.vehicleService.getActiveVehicleForDriver(ride.driverId);
+      if (v) {
+        vehicle = {
+          make: v.make,
+          model: v.model,
+          licensePlate: v.licensePlate,
+          color: v.color,
+        };
+      }
+    } catch {}
+
+    return {
+      driverId: ride.driverId,
+      firstName: driver.firstName,
+      lastName: driver.lastName,
+      vehicle,
+    };
+  }
+
   async storeBatches(rideId: string, batches: string[][]): Promise<void> {
     await this.redisService.set(`ride:batches:${rideId}`, batches, BATCH_TTL_SECONDS);
     await this.redisService.set(`ride:batch:index:${rideId}`, 0, BATCH_TTL_SECONDS);
@@ -247,7 +273,7 @@ export class RideService {
 
   /**
    * Calculate ride price using the Haversine distance.
-   * Formula: 150 RSD base + 100 RSD per km
+   * Formula: 150 RSD base + 80 RSD per km
    */
   private calculatePrice(
     pickupLat: number,
@@ -264,7 +290,7 @@ export class RideService {
       Math.cos(toRad(pickupLat)) * Math.cos(toRad(destLat)) * Math.sin(dLng / 2) ** 2;
     const distanceMeters = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const km = distanceMeters / 1000;
-    return Math.round(150 + 100 * km);
+    return Math.round(150 + 80 * km);
   }
 
   async getCurrentBatch(rideId: string): Promise<string[] | null> {
