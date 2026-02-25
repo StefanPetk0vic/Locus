@@ -123,12 +123,13 @@ export class PaymentService {
   /* ──────────────────────────────────────────────
    * 4. Pre-authorize (hold) funds for a ride
    *    Returns the PaymentIntent ID
+   *    NOTE: Does NOT save the invoice — call saveRideInvoice() after the ride row exists.
    * ────────────────────────────────────────────── */
   async authorizeRidePayment(
     riderId: string,
     rideId: string,
     amountRSD: number,
-  ): Promise<string> {
+  ): Promise<{ paymentIntentId: string; invoiceId: string }> {
     const rider = await this.riderRepo.findOne({ where: { id: riderId } });
     if (!rider) throw new NotFoundException('Rider not found');
     if (!rider.stripeCustomerId || !rider.stripePaymentMethodId) {
@@ -140,7 +141,7 @@ export class PaymentService {
     const existing = await this.paymentRepository.findInvoiceByRideId(rideId);
     if (existing && existing.stripePaymentIntentId) {
       this.logger.log(`Ride ${rideId} already has PaymentIntent ${existing.stripePaymentIntentId}`);
-      return existing.stripePaymentIntentId;
+      return { paymentIntentId: existing.stripePaymentIntentId, invoiceId: existing.id };
     }
 
     const amountInSmallestUnit = Math.round(amountRSD * 100); // RSD → para
@@ -169,22 +170,13 @@ export class PaymentService {
         );
       }
 
-      const invoice = new Invoice(
-        crypto.randomUUID(),
-        rideId,
-        riderId,
-        amountRSD,
-        'RSD',
-        paymentIntent.id,
-        InvoiceStatus.AUTHORIZED,
-      );
-      await this.paymentRepository.saveInvoice(invoice);
+      const invoiceId = crypto.randomUUID();
 
       this.logger.log(
         `Authorized ${amountRSD} RSD for ride ${rideId} — PI: ${paymentIntent.id}`,
       );
 
-      return paymentIntent.id;
+      return { paymentIntentId: paymentIntent.id, invoiceId };
     } catch (err) {
       if (err instanceof BadRequestException) throw err;
       this.logger.error(`Stripe authorization error: ${err.message}`);
@@ -192,6 +184,29 @@ export class PaymentService {
         'Payment authorization failed. Insufficient funds or card declined.',
       );
     }
+  }
+
+  /* ──────────────────────────────────────────────
+   * 4b. Persist the invoice AFTER the ride row exists in the DB
+   * ────────────────────────────────────────────── */
+  async saveRideInvoice(
+    invoiceId: string,
+    rideId: string,
+    riderId: string,
+    amountRSD: number,
+    paymentIntentId: string,
+  ): Promise<void> {
+    const invoice = new Invoice(
+      invoiceId,
+      rideId,
+      riderId,
+      amountRSD,
+      'RSD',
+      paymentIntentId,
+      InvoiceStatus.AUTHORIZED,
+    );
+    await this.paymentRepository.saveInvoice(invoice);
+    this.logger.log(`Invoice ${invoiceId} saved for ride ${rideId}`);
   }
 
   /* ──────────────────────────────────────────────

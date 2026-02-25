@@ -38,12 +38,15 @@ export class RideService {
 
     // Pre-authorize payment — will throw if card declined / insufficient funds
     let paymentIntentId: string | null = null;
+    let invoiceId: string | null = null;
     try {
-      paymentIntentId = await this.paymentService.authorizeRidePayment(
+      const auth = await this.paymentService.authorizeRidePayment(
         riderId,
         rideId,
         ridePrice,
       );
+      paymentIntentId = auth.paymentIntentId;
+      invoiceId = auth.invoiceId;
     } catch (err) {
       throw new BadRequestException(
         err.message || 'Payment authorization failed. Please check your card.',
@@ -65,6 +68,17 @@ export class RideService {
     );
 
     const savedRide = await this.rideRepository.save(newRide);
+
+    // Save the invoice AFTER the ride exists (FK constraint)
+    if (invoiceId && paymentIntentId) {
+      await this.paymentService.saveRideInvoice(
+        invoiceId,
+        savedRide.id,
+        riderId,
+        ridePrice,
+        paymentIntentId,
+      );
+    }
 
     // Find nearby drivers and store batches BEFORE emitting to Kafka
     const nearbyDriverIds = await this.redisService.georadiusNearby(
