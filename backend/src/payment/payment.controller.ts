@@ -8,10 +8,10 @@ import {
   Req,
   Headers,
   HttpCode,
-  RawBodyRequest,
 } from '@nestjs/common';
+import type { RawBodyRequest } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { Request } from 'express';
+import type { Request } from 'express';
 import { PaymentService } from './payment.service';
 import { GetUser } from '../auth/get-user.decorator';
 import { User } from '../user/infrastructure/user.entity';

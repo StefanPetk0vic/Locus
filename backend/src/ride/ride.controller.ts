@@ -137,6 +137,8 @@ export class RideController implements OnModuleInit {
       rideId: completed.id,
       driverId: completed.driverId,
       status: completed.status,
+      price: completed.price,
+      paymentStatus: 'PAID',
     });
     return completed;
   }

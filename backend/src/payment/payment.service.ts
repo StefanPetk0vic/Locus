@@ -113,7 +113,7 @@ export class PaymentService {
       } catch (err) {
         this.logger.warn(`Failed to detach PM from Stripe: ${err.message}`);
       }
-      rider.stripePaymentMethodId = null;
+      rider.stripePaymentMethodId = null as any;
       await this.riderRepo.save(rider);
     }
 
