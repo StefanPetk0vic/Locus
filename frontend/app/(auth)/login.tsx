@@ -15,21 +15,25 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import Input from '../../src/components/Input';
 import Button from '../../src/components/Button';
 import { useAuthStore } from '../../src/store/authStore';
-import { Colors, Typography, Spacing, BorderRadius } from '../../src/config/theme';
+import { Colors, Typography, Spacing, BorderRadius } from '../../src/config/theme';
+
 export default function Login() {
   const router = useRouter();
-  const login = useAuthStore((s) => s.login);
+  const login = useAuthStore((s) => s.login);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+
   const validate = () => {
     const errs: typeof errors = {};
     if (!email.trim()) errs.email = 'Email is required';
     if (!password) errs.password = 'Password is required';
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  };
+  };
+
   const handleLogin = async () => {
     if (!validate()) return;
     setLoading(true);
@@ -42,11 +46,12 @@ export default function Login() {
     } finally {
       setLoading(false);
     }
-  };
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -59,7 +64,8 @@ export default function Login() {
           </View>
           <Text style={styles.title}>Welcome back</Text>
           <Text style={styles.subtitle}>Sign in to continue your journey</Text>
-        </Animated.View>
+        </Animated.View>
+
         {}
         <Animated.View entering={FadeInDown.delay(150).duration(500)} style={styles.form}>
           <Input
@@ -72,7 +78,8 @@ export default function Login() {
             autoComplete="email"
             error={errors.email}
             icon={<Mail size={18} color={Colors.textSecondary} />}
-          />
+          />
+
           <Input
             label="Password"
             placeholder="Enter your password"
@@ -81,14 +88,16 @@ export default function Login() {
             secureTextEntry
             error={errors.password}
             icon={<Lock size={18} color={Colors.textSecondary} />}
-          />
+          />
+
           <Button
             title="Sign In"
             onPress={handleLogin}
             loading={loading}
             style={styles.button}
           />
-        </Animated.View>
+        </Animated.View>
+
         {}
         <Animated.View entering={FadeInDown.delay(300).duration(500)} style={styles.footer}>
           <Text style={styles.footerText}>Don't have an account?</Text>
@@ -99,7 +108,8 @@ export default function Login() {
       </ScrollView>
     </KeyboardAvoidingView>
   );
-}
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: Colors.background },
   scroll: {

@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
-import { storage } from '../utils/storage';
+import { storage } from '../utils/storage';
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15_000,
@@ -8,8 +9,10 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'ngrok-skip-browser-warning': '69420',
   },
-});
-console.log('[API] Base URL:', API_BASE_URL);
+});
+
+console.log('[API] Base URL:', API_BASE_URL);
+
 api.interceptors.request.use(async (config) => {
   const token = await storage.getToken();
   if (token) {
@@ -22,7 +25,8 @@ api.interceptors.request.use(async (config) => {
     token ? `(token: ...${token.slice(-8)})` : '(NO TOKEN)',
   );
   return config;
-});
+});
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -34,7 +38,8 @@ api.interceptors.response.use(
     }
     return Promise.reject(error);
   },
-);
+);
+
 export interface RegisterPayload {
   email: string;
   password: string;
@@ -42,16 +47,19 @@ export interface RegisterPayload {
   lastName: string;
   role: 'RIDER' | 'DRIVER';
   licensePlate?: string;
-}
+}
+
 export interface LoginPayload {
   email: string;
   password: string;
-}
+}
+
 export const authApi = {
   register: (data: RegisterPayload) => api.post('/auth/register', data),
   login: (data: LoginPayload) =>
     api.post<{ accessToken: string }>('/auth/login', data),
-};
+};
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -62,18 +70,25 @@ export interface UserProfile {
   licensePlate?: string;
   isVerified?: boolean;
   rides?: number;
-}
+  hasPaymentMethod?: boolean;
+}
+
 export const userApi = {
   getProfile: () => api.get<UserProfile>('/users/profile'),
   updateLicensePlate: (driverId: string, licensePlate: string) =>
     api.patch(`/users/drivers/${driverId}/license-plate`, { licensePlate }),
-};
+  updateDriverLocation: (driverId: string, latitude: number, longitude: number) =>
+    api.post(`/users/drivers/${driverId}/update-location`, { latitude, longitude }),
+};
+
 export interface RideRequest {
   pickupLat: number;
   pickupLng: number;
   destLat: number;
   destLng: number;
-}
+  price?: number;
+}
+
 export interface RideResponse {
   id: string;
   pickupLat: number;
@@ -85,7 +100,8 @@ export interface RideResponse {
   riderId: string;
   driverId: string | null;
   createdAt: string;
-}
+}
+
 export const rideApi = {
   requestRide: (data: RideRequest) =>
     api.post<RideResponse>('/rides/request', data),
@@ -99,5 +115,110 @@ export const rideApi = {
     api.patch<RideResponse>(`/rides/${rideId}/complete`),
   updateDriverLocation: (rideId: string, lat: number, lng: number) =>
     api.post(`/rides/${rideId}/location`, { lat, lng }),
-};
+  getCompletedRides: () =>
+    api.get<RideResponse[]>('/rides/completed'),
+  getVehicleForRide: (rideId: string) =>
+    api.get<VehicleResponse>(`/rides/${rideId}/vehicle`),
+};
+
+/* ── Vehicle ── */
+
+export interface VehiclePayload {
+  make: string;
+  model: string;
+  licensePlate: string;
+  color: string;
+}
+
+export interface VehicleResponse {
+  id: string;
+  driverId: string;
+  make: string;
+  model: string;
+  licensePlate: string;
+  color: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export const vehicleApi = {
+  addVehicle: (data: VehiclePayload) =>
+    api.post<VehicleResponse>('/vehicles/add', data),
+  getMyVehicles: () =>
+    api.get<VehicleResponse[]>('/vehicles/me'),
+  activateVehicle: (vehicleId: string) =>
+    api.post<VehicleResponse>(`/vehicles/${vehicleId}/activate`),
+  deleteVehicle: (vehicleId: string) =>
+    api.delete(`/vehicles/${vehicleId}`),
+};
+
+/* ── Reviews ── */
+
+export interface ReviewPayload {
+  rideId: string;
+  rating: number;
+  comment?: string;
+}
+
+export interface ReviewResponse {
+  id: string;
+  rideId: string;
+  reviewerId: string;
+  revieweeId: string;
+  rating: number;
+  comment?: string;
+  createdAt: string;
+}
+
+export interface RatingResponse {
+  average: number | null;
+  count: number;
+}
+
+export const reviewApi = {
+  createReview: (data: ReviewPayload) =>
+    api.post<ReviewResponse>('/reviews/Create', data),
+  getReviewsForUser: (userId: string) =>
+    api.get<ReviewResponse[]>(`/reviews/user/${userId}`),
+  getAverageRating: (userId: string) =>
+    api.get<RatingResponse>(`/reviews/user/${userId}/rating`),
+  getMyReviews: () =>
+    api.get<ReviewResponse[]>('/reviews/me'),
+  getMyRating: () =>
+    api.get<RatingResponse>('/reviews/me/rating'),
+};
+
+/* ── Payments ── */
+
+export interface PaymentMethodInfo {
+  id?: string;
+  last4: string;
+  brand: string;
+  expMonth: number;
+  expYear: number;
+}
+
+export interface InvoiceResponse {
+  id: string;
+  rideId: string;
+  userId: string;
+  amount: number;
+  currency: string;
+  stripePaymentIntentId: string | null;
+  status: 'PENDING' | 'AUTHORIZED' | 'PAID' | 'FAILED' | 'REFUNDED' | 'CANCELLED';
+  createdAt: string;
+  paidAt: string | null;
+}
+
+export const paymentApi = {
+  addCard: (cardToken: string) =>
+    api.post<PaymentMethodInfo>('/payments/add-card', { cardToken }),
+  getPaymentMethod: () =>
+    api.get<PaymentMethodInfo | null>('/payments/method'),
+  removePaymentMethod: () =>
+    api.delete('/payments/method'),
+  getInvoices: () =>
+    api.get<InvoiceResponse[]>('/payments/invoices'),
+};
+
 export default api;

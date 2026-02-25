@@ -1,101 +1,196 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
-import { Clock, MapPin, Navigation2 } from 'lucide-react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
+import { Clock, Star } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Colors, Typography, Spacing, BorderRadius } from '../../src/config/theme';
-import { SafeAreaView } from 'react-native-safe-area-context';
-interface MockRide {
-  id: string;
-  date: string;
-  from: string;
-  to: string;
-  price: string;
-  status: string;
-}
-const mockHistory: MockRide[] = [
-  {
-    id: '1',
-    date: 'Feb 17, 2026',
-    from: 'Home',
-    to: 'City Centre',
-    price: '$8.50',
-    status: 'Completed',
-  },
-  {
-    id: '2',
-    date: 'Feb 16, 2026',
-    from: 'Office',
-    to: 'Airport',
-    price: '$24.00',
-    status: 'Completed',
-  },
-  {
-    id: '3',
-    date: 'Feb 14, 2026',
-    from: 'Mall',
-    to: 'Home',
-    price: '$11.20',
-    status: 'Cancelled',
-  },
-];
-function RideCard({ ride, index }: { ride: MockRide; index: number }) {
-  const isCancelled = ride.status === 'Cancelled';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { rideApi, RideResponse, paymentApi, InvoiceResponse } from '../../src/services/api';
+import { reverseGeocode } from '../../src/utils/reverseGeocode';
+import ReviewModal from '../../src/components/ReviewModal';
+
+interface DisplayRide extends RideResponse {
+  pickupAddress: string;
+  destAddress: string;
+  paymentStatus?: string;
+}
+
+function RideCard({
+  ride,
+  index,
+  onReview,
+}: {
+  ride: DisplayRide;
+  index: number;
+  onReview: (rideId: string) => void;
+}) {
+  const date = new Date(ride.createdAt).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
   return (
     <Animated.View
       entering={FadeInDown.delay(index * 80).duration(400)}
       style={styles.card}
     >
       <View style={styles.cardHeader}>
-        <Text style={styles.cardDate}>{ride.date}</Text>
-        <Text
-          style={[
-            styles.cardStatus,
-            isCancelled && { color: Colors.error },
-          ]}
-        >
-          {ride.status}
-        </Text>
-      </View>
+        <Text style={styles.cardDate}>{date}</Text>
+        <Text style={styles.cardStatus}>Completed</Text>
+      </View>
+
       <View style={styles.route}>
         <View style={styles.routeRow}>
           <View style={[styles.dot, { backgroundColor: Colors.primary }]} />
-          <Text style={styles.routeText}>{ride.from}</Text>
+          <Text style={styles.routeText} numberOfLines={1}>
+            {ride.pickupAddress}
+          </Text>
         </View>
         <View style={styles.routeLine} />
         <View style={styles.routeRow}>
           <View style={[styles.dot, { backgroundColor: Colors.secondary }]} />
-          <Text style={styles.routeText}>{ride.to}</Text>
+          <Text style={styles.routeText} numberOfLines={1}>
+            {ride.destAddress}
+          </Text>
         </View>
-      </View>
+      </View>
+
       <View style={styles.cardFooter}>
-        <Text style={styles.price}>{ride.price}</Text>
+        <View>
+          <Text style={styles.price}>
+            {ride.price ? `${ride.price} RSD` : '—'}
+          </Text>
+          {ride.paymentStatus && (
+            <Text style={[styles.paymentStatus, {
+              color: ride.paymentStatus === 'PAID' ? Colors.success : Colors.textSecondary,
+            }]}>
+              {ride.paymentStatus === 'PAID' ? '✓ Paid' : ride.paymentStatus}
+            </Text>
+          )}
+        </View>
+        <TouchableOpacity
+          style={styles.reviewBtn}
+          onPress={() => onReview(ride.id)}
+          activeOpacity={0.7}
+        >
+          <Star size={14} color={Colors.secondary} />
+          <Text style={styles.reviewBtnText}>Review</Text>
+        </TouchableOpacity>
       </View>
     </Animated.View>
   );
-}
+}
+
 export default function ActivityScreen() {
+  const [rides, setRides] = useState<DisplayRide[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [reviewRideId, setReviewRideId] = useState<string | null>(null);
+
+  const fetchRides = useCallback(async () => {
+    try {
+      const [ridesRes, invoicesRes] = await Promise.all([
+        rideApi.getCompletedRides(),
+        paymentApi.getInvoices().catch(() => ({ data: [] as InvoiceResponse[] })),
+      ]);
+      const data = ridesRes.data;
+      const invoices = invoicesRes.data;
+
+      // Build a map from rideId → invoice status
+      const invoiceMap = new Map<string, string>();
+      for (const inv of invoices) {
+        invoiceMap.set(inv.rideId, inv.status);
+      }
+
+      /* Resolve addresses in parallel */
+      const withAddresses = await Promise.all(
+        data.map(async (r: RideResponse) => {
+          const [pickupAddress, destAddress] = await Promise.all([
+            reverseGeocode(r.pickupLat, r.pickupLng),
+            reverseGeocode(r.destinationLat, r.destinationLng),
+          ]);
+          return {
+            ...r,
+            pickupAddress,
+            destAddress,
+            paymentStatus: invoiceMap.get(r.id),
+          } as DisplayRide;
+        }),
+      );
+      setRides(withAddresses);
+    } catch {
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchRides();
+  }, [fetchRides]);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchRides();
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.container}>
         <Text style={styles.title}>Activity</Text>
-        <Text style={styles.subtitle}>Your recent rides</Text>
-        <FlatList
-          data={mockHistory}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item, index }) => <RideCard ride={item} index={index} />}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Clock size={40} color={Colors.border} strokeWidth={1.5} />
-              <Text style={styles.emptyText}>No rides yet</Text>
-            </View>
-          }
-        />
+        <Text style={styles.subtitle}>Your completed rides</Text>
+
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="small" color={Colors.primary} />
+          </View>
+        ) : (
+          <FlatList
+            data={rides}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item, index }) => (
+              <RideCard
+                ride={item}
+                index={index}
+                onReview={(id) => setReviewRideId(id)}
+              />
+            )}
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+            }
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Clock size={40} color={Colors.border} strokeWidth={1.5} />
+                <Text style={styles.emptyText}>No completed rides yet</Text>
+              </View>
+            }
+          />
+        )}
       </View>
+
+      {/* Review Modal */}
+      {reviewRideId && (
+        <ReviewModal
+          visible={!!reviewRideId}
+          onClose={() => setReviewRideId(null)}
+          rideId={reviewRideId}
+          onSubmitted={fetchRides}
+        />
+      )}
     </SafeAreaView>
   );
-}
+}
+
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
@@ -170,10 +265,36 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     paddingTop: Spacing.sm,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   price: {
     ...Typography.headline,
     color: Colors.text,
+  },
+  paymentStatus: {
+    ...Typography.caption,
+    marginTop: 2,
+  },
+  reviewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.secondaryLight,
+  },
+  reviewBtnText: {
+    ...Typography.caption,
+    color: Colors.secondary,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  loadingWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   empty: {
     alignItems: 'center',

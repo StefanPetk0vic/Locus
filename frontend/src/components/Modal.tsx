@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from 'react-native';
 import Animated, {
   FadeIn,
@@ -15,20 +16,25 @@ import Animated, {
   SlideOutDown,
 } from 'react-native-reanimated';
 import { X } from 'lucide-react-native';
-import { Colors, BorderRadius, Typography, Spacing, Shadows } from '../config/theme';
+import { Colors, BorderRadius, Typography, Spacing, Shadows } from '../config/theme';
+
 interface ModalProps {
   visible: boolean;
   onClose: () => void;
   title?: string;
-  children: React.ReactNode;  
+  children: React.ReactNode;
   position?: 'bottom' | 'center';
-}
+  /** Set false when children contain a FlatList / VirtualizedList */
+  scrollable?: boolean;
+}
+
 export default function Modal({
   visible,
   onClose,
   title,
   children,
   position = 'bottom',
+  scrollable = true,
 }: ModalProps) {
   return (
     <RNModal
@@ -39,7 +45,7 @@ export default function Modal({
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.wrapper}
       >
         {}
@@ -53,12 +59,13 @@ export default function Modal({
             activeOpacity={1}
             onPress={onClose}
           />
-        </Animated.View>
+        </Animated.View>
+
         {}
         <Animated.View
           entering={
             position === 'bottom'
-              ? SlideInDown.springify().damping(20).stiffness(150)
+              ? SlideInDown.duration(350)
               : FadeIn.duration(250)
           }
           exiting={
@@ -72,7 +79,8 @@ export default function Modal({
           ]}
         >
           {}
-          {position === 'bottom' && <View style={styles.handle} />}
+          {position === 'bottom' && <View style={styles.handle} />}
+
           {}
           {title && (
             <View style={styles.header}>
@@ -81,13 +89,25 @@ export default function Modal({
                 <X size={22} color={Colors.textSecondary} />
               </TouchableOpacity>
             </View>
-          )}
-          {children}
+          )}
+
+          {scrollable ? (
+            <ScrollView
+              bounces={false}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {children}
+            </ScrollView>
+          ) : (
+            children
+          )}
         </Animated.View>
       </KeyboardAvoidingView>
     </RNModal>
   );
-}
+}
+
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,

@@ -8,7 +8,7 @@ import {
   Alert,
   Dimensions,
 } from 'react-native';
-import { Search, LocateFixed, Navigation2, MapPin, CircleDot, X, Play, CheckCircle2, CarTaxiFront } from 'lucide-react-native';
+import { Search, LocateFixed, Navigation2, MapPin, CircleDot, X, Play, CheckCircle2, CarTaxiFront, Star } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useAuthStore } from '../../src/store/authStore';
 import { useLocationStore } from '../../src/store/locationStore';
@@ -17,19 +17,29 @@ import MapContainer from '../../src/components/MapContainer';
 import RideRequestModal from '../../src/components/RideRequestModal';
 import IncomingRideModal from '../../src/components/IncomingRideModal';
 import DestinationSearch from '../../src/components/DestinationSearch';
+import ReviewModal from '../../src/components/ReviewModal';
+import ReviewsList from '../../src/components/ReviewsList';
+import UserRatingBadge from '../../src/components/UserRatingBadge';
 import { fetchRoute, LatLng, calculatePrice } from '../../src/utils/fetchRoute';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../src/config/theme';
-type Region = { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number };
-const { width } = Dimensions.get('window');
+import { reverseGeocode } from '../../src/utils/reverseGeocode';
+import { userApi } from '../../src/services/api';
+import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../src/config/theme';
+
+type Region = { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number };
+
+const { width } = Dimensions.get('window');
+
 const DEFAULT_REGION: Region = {
   latitude: 43.3313,
   longitude: 21.8925,
   latitudeDelta: 0.02,
   longitudeDelta: 0.02,
-};
+};
+
 export default function HomeScreen() {
   const user = useAuthStore((s) => s.user);
-  const isDriver = user?.role === 'DRIVER';
+  const isDriver = user?.role === 'DRIVER';
+
   const { location, nearbyDrivers, startWatching, errorMsg } = useLocationStore();
   const {
     currentRide,
@@ -43,7 +53,8 @@ export default function HomeScreen() {
     completeRide,
     clearRide,
     setIncomingRequest,
-  } = useRideStore();
+  } = useRideStore();
+
   const mapRef = useRef<any>(null);
   const hasCenteredOnUser = useRef(false);
   const [showRideModal, setShowRideModal] = useState(false);
@@ -60,14 +71,38 @@ export default function HomeScreen() {
   const [tracking, setTracking] = useState(false); 
   const [nearPickup, setNearPickup] = useState(false); 
   const [nearDestination, setNearDestination] = useState(false); 
-  const [rideActionLoading, setRideActionLoading] = useState(false);
+  const [rideActionLoading, setRideActionLoading] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [completedRideId, setCompletedRideId] = useState<string | null>(null);
+  const [showDriverReviews, setShowDriverReviews] = useState(false);
+  const [driverLocationAddr, setDriverLocationAddr] = useState<string>('');
+
   const rideActive = !!(currentRide && currentRide.status !== 'COMPLETED' && currentRide.status !== 'CANCELLED');
-  const rideInProgress = currentRide?.status === 'IN_PROGRESS';
+  const rideInProgress = currentRide?.status === 'IN_PROGRESS';
+
   useEffect(() => {
     startWatching();
     listen();
     return () => unlisten();
-  }, []);
+  }, []);
+
+  /* ── Driver: push location to server every 30s ── */
+  useEffect(() => {
+    if (!isDriver || !user?.id || !location) return;
+
+    // Send immediately on mount / location change
+    userApi.updateDriverLocation(user.id, location.latitude, location.longitude).catch(() => {});
+
+    const interval = setInterval(() => {
+      const loc = useLocationStore.getState().location;
+      if (loc) {
+        userApi.updateDriverLocation(user.id, loc.latitude, loc.longitude).catch(() => {});
+      }
+    }, 30_000);
+
+    return () => clearInterval(interval);
+  }, [isDriver, user?.id, !!location]);
+
   useEffect(() => {
     if (!location || hasCenteredOnUser.current) return;
     if (Platform.OS === 'web' || !mapRef.current?.animateToRegion) return;
@@ -81,8 +116,10 @@ export default function HomeScreen() {
       },
       600,
     );
-  }, [location]);  
-  useEffect(() => {    
+  }, [location]);
+  
+  useEffect(() => {
+    
     const origin = pickup || (location ? { lat: location.latitude, lng: location.longitude } : null);
     if (!origin || !destination) {
       setRouteCoordinates([]);
@@ -101,7 +138,8 @@ export default function HomeScreen() {
           const km = result.distanceMeters / 1000;
           setRideDistanceKm(km);
           setRidePrice(calculatePrice(result.distanceMeters));
-        }        
+        }
+        
         if (result.coordinates.length > 1 && mapRef.current?.fitToCoordinates && Platform.OS !== 'web') {
           mapRef.current.fitToCoordinates(result.coordinates, {
             edgePadding: { top: 120, right: 60, bottom: 200, left: 60 },
@@ -111,7 +149,8 @@ export default function HomeScreen() {
       }
     });
     return () => { cancelled = true; };
-  }, [destination, pickup, location?.latitude, location?.longitude]);  
+  }, [destination, pickup, location?.latitude, location?.longitude]);
+  
   const distanceBetween = (
     a: { lat: number; lng: number },
     b: { lat: number; lng: number },
@@ -124,15 +163,18 @@ export default function HomeScreen() {
     const sinLng = Math.sin(dLng / 2);
     const h = sinLat * sinLat + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * sinLng * sinLng;
     return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-  };  
+  };
+  
   useEffect(() => {
     if (!isDriver || !currentRide || !location) return;
-    if (currentRide.status === 'COMPLETED' || currentRide.status === 'CANCELLED') return;
+    if (currentRide.status === 'COMPLETED' || currentRide.status === 'CANCELLED') return;
+
     let cancelled = false;
     const dest =
       currentRide.status === 'IN_PROGRESS'
         ? { lat: currentRide.destinationLat, lng: currentRide.destinationLng }
-        : { lat: currentRide.pickupLat, lng: currentRide.pickupLng };
+        : { lat: currentRide.pickupLat, lng: currentRide.pickupLng };
+
     fetchRoute(
       { latitude: location.latitude, longitude: location.longitude },
       dest,
@@ -146,13 +188,17 @@ export default function HomeScreen() {
           });
         }
       }
-    });
+    });
+
     return () => { cancelled = true; };
-  }, [isDriver, currentRide?.id, currentRide?.status, location?.latitude, location?.longitude]);  
+  }, [isDriver, currentRide?.id, currentRide?.status, location?.latitude, location?.longitude]);
+  
   useEffect(() => {
-    if (!isDriver || !currentRide || !location) return;
+    if (!isDriver || !currentRide || !location) return;
+
     const driverPos = { lat: location.latitude, lng: location.longitude };
-    const PROXIMITY_THRESHOLD = 150; 
+    const PROXIMITY_THRESHOLD = 150; 
+
     if (currentRide.status === 'ACCEPTED') {
       const pickupPos = { lat: currentRide.pickupLat, lng: currentRide.pickupLng };
       const dist = distanceBetween(driverPos, pickupPos);
@@ -167,7 +213,8 @@ export default function HomeScreen() {
       setNearPickup(false);
       setNearDestination(false);
     }
-  }, [isDriver, currentRide?.status, location?.latitude, location?.longitude]);
+  }, [isDriver, currentRide?.status, location?.latitude, location?.longitude]);
+
   useEffect(() => {
     if (isDriver || !tracking || !rideInProgress || !driverLocation) return;
     if (Platform.OS === 'web' || !mapRef.current?.animateToRegion) return;
@@ -180,7 +227,32 @@ export default function HomeScreen() {
       },
       600,
     );
-  }, [driverLocation?.lat, driverLocation?.lng, rideInProgress, tracking]);  
+  }, [driverLocation?.lat, driverLocation?.lng, rideInProgress, tracking]);
+
+  /* Resolve driver location to address */
+  useEffect(() => {
+    if (!driverLocation) return;
+    reverseGeocode(driverLocation.lat, driverLocation.lng).then(setDriverLocationAddr);
+  }, [driverLocation?.lat, driverLocation?.lng]);
+
+  /* When rider sees ride.completed, prompt review */
+  useEffect(() => {
+    if (!isDriver && currentRide?.status === 'COMPLETED' && tracking) {
+      const rideId = currentRide.id;
+      setTimeout(() => {
+        setCompletedRideId(rideId);
+        setShowReviewModal(true);
+        setTracking(false);
+        setDestination(null);
+        setDestLabel(null);
+        setPickup(null);
+        setPickupLabel('My location');
+        setRouteCoordinates([]);
+        clearRide();
+      }, 1500);
+    }
+  }, [currentRide?.status]);
+  
   const handleStartRide = async () => {
     if (!currentRide) return;
     setRideActionLoading(true);
@@ -192,22 +264,26 @@ export default function HomeScreen() {
     } finally {
       setRideActionLoading(false);
     }
-  };  
+  };
+  
   const handleCompleteRide = async () => {
     if (!currentRide) return;
+    const rideId = currentRide.id;
     setRideActionLoading(true);
     try {
-      await completeRide(currentRide.id);
+      await completeRide(rideId);
       setNearDestination(false);
       setDriverRouteCoordinates([]);
-      Alert.alert('Ride Completed', 'The ride has been completed successfully.');
+      setCompletedRideId(rideId);
+      setShowReviewModal(true);
       clearRide();
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.message || 'Could not complete ride');
     } finally {
       setRideActionLoading(false);
     }
-  };
+  };
+
   const region: Region = location
     ? {
         latitude: location.latitude,
@@ -215,7 +291,8 @@ export default function HomeScreen() {
         latitudeDelta: 0.015,
         longitudeDelta: 0.015,
       }
-    : DEFAULT_REGION;
+    : DEFAULT_REGION;
+
   const centerOnUser = () => {
     if (location && Platform.OS !== 'web' && mapRef.current?.animateToRegion) {
       mapRef.current.animateToRegion(
@@ -227,20 +304,24 @@ export default function HomeScreen() {
         400,
       );
     }
-  };  
+  };
+  
   const handleMapPress = (e: any) => {
     if (isDriver) return;
     if (rideActive) return;
     if (Platform.OS === 'web' || !e.nativeEvent?.coordinate) return;
     const { latitude, longitude } = e.nativeEvent.coordinate;
     setDestination({ lat: latitude, lng: longitude });
-    setDestLabel(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
-  };  
+    setDestLabel('Loading address...');
+    reverseGeocode(latitude, longitude).then((addr) => setDestLabel(addr));
+  };
+  
   const handleConfirmDestination = () => {
     const origin = pickup || (location ? { lat: location.latitude, lng: location.longitude } : null);
     if (!origin || !destination) return;
     setShowRideModal(true);
-  };  
+  };
+  
   const handleAcceptRide = async () => {
     if (!incomingRequest) return;
     setAcceptLoading(true);
@@ -251,7 +332,8 @@ export default function HomeScreen() {
     } finally {
       setAcceptLoading(false);
     }
-  };
+  };
+
   return (
     <View style={styles.container}>
       {}
@@ -268,7 +350,8 @@ export default function HomeScreen() {
         routeCoordinates={routeCoordinates}
         driverRouteCoordinates={driverRouteCoordinates}
         onPress={handleMapPress}
-      />
+      />
+
       {}
       <Animated.View entering={FadeInUp.delay(300).duration(400)} style={styles.topBar}>
         <View style={styles.greetingRow}>
@@ -280,21 +363,24 @@ export default function HomeScreen() {
               {isDriver ? 'Ready to drive?' : 'Where are you going?'}
             </Text>
           </View>
-        </View>
+        </View>
+
         {!isDriver && !rideActive && (
           <TouchableOpacity style={styles.searchBar} activeOpacity={0.7} onPress={() => setSearchMode('destination')}>
             <Search size={18} color={Colors.textSecondary} />
             <Text style={styles.searchPlaceholder}>{destLabel || 'Search destination'}</Text>
           </TouchableOpacity>
         )}
-      </Animated.View>
+      </Animated.View>
+
       {}
       <TouchableOpacity style={styles.locateBtn} onPress={centerOnUser} activeOpacity={0.8}>
         <LocateFixed size={20} color={Colors.primary} />
-      </TouchableOpacity>
+      </TouchableOpacity>
+
       {}
       {destination && !isDriver && !showRideModal && !tracking && (
-        <Animated.View entering={FadeInDown.springify().damping(18)} style={styles.bottomCard}>
+        <Animated.View entering={FadeInDown.duration(350)} style={styles.bottomCard}>
           {}
           <TouchableOpacity
             style={styles.routeRow}
@@ -306,8 +392,10 @@ export default function HomeScreen() {
               <Text style={styles.routeLabel}>PICKUP</Text>
               <Text style={styles.routeValue} numberOfLines={1}>{pickupLabel}</Text>
             </View>
-          </TouchableOpacity>
-          <View style={styles.routeLine} />
+          </TouchableOpacity>
+
+          <View style={styles.routeLine} />
+
           {}
           <TouchableOpacity
             style={styles.routeRow}
@@ -318,10 +406,11 @@ export default function HomeScreen() {
             <View style={styles.routeTexts}>
               <Text style={styles.routeLabel}>DESTINATION</Text>
               <Text style={styles.routeValue} numberOfLines={1}>
-                {destLabel || `${destination.lat.toFixed(4)}, ${destination.lng.toFixed(4)}`}
+                {destLabel || 'Selected destination'}
               </Text>
             </View>
-          </TouchableOpacity>
+          </TouchableOpacity>
+
           {}
           <TouchableOpacity
             style={styles.confirmBtn}
@@ -332,7 +421,8 @@ export default function HomeScreen() {
             <Text style={styles.confirmText}>Request Ride</Text>
           </TouchableOpacity>
         </Animated.View>
-      )}
+      )}
+
       {}
       {(pickup || location) && destination && (
         <RideRequestModal
@@ -348,7 +438,8 @@ export default function HomeScreen() {
             setRideDistanceKm(undefined);
             clearRide();
           }}
-          onDriverMatched={() => {            
+          onDriverMatched={() => {
+            
             setShowRideModal(false);
             setTracking(true);
           }}
@@ -361,10 +452,11 @@ export default function HomeScreen() {
           price={ridePrice}
           distanceKm={rideDistanceKm}
         />
-      )}
+      )}
+
       {}
       {tracking && !isDriver && (
-        <Animated.View entering={FadeInDown.springify().damping(18)} style={styles.trackingCard}>
+        <Animated.View entering={FadeInDown.duration(350)} style={styles.trackingCard}>
           <View style={styles.trackingHeader}>
             <CarTaxiFront size={20} color={Colors.secondary} />
             <Text style={styles.trackingTitle}>
@@ -374,7 +466,7 @@ export default function HomeScreen() {
                 ? 'Ride completed!'
                 : 'Driver is on the way'}
             </Text>
-            {currentRide?.status !== 'IN_PROGRESS' && (
+            {currentRide?.status !== 'IN_PROGRESS' && currentRide?.status !== 'COMPLETED' && (
               <TouchableOpacity
                 onPress={async () => {
                   if (currentRide) {
@@ -399,14 +491,49 @@ export default function HomeScreen() {
           )}
           {driverLocation && (
             <Text style={styles.trackingSubtext}>
-              Driver at {driverLocation.lat.toFixed(4)}, {driverLocation.lng.toFixed(4)}
+              {driverLocationAddr || 'Locating driver...'}
             </Text>
           )}
           {!driverLocation && (
             <Text style={styles.trackingSubtext}>Waiting for driver location...</Text>
           )}
+
+          {/* View driver reviews during ride */}
+          {currentRide?.driverId && (currentRide?.status === 'IN_PROGRESS' || currentRide?.status === 'ACCEPTED') && (
+            <TouchableOpacity
+              style={styles.viewReviewsBtn}
+              onPress={() => setShowDriverReviews(true)}
+              activeOpacity={0.7}
+            >
+              <Star size={14} color={Colors.secondary} />
+              <Text style={styles.viewReviewsBtnText}>View Driver Reviews</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* When ride is completed, show review prompt */}
+          {currentRide?.status === 'COMPLETED' && (
+            <TouchableOpacity
+              style={[styles.confirmBtn, { marginTop: Spacing.md }]}
+              onPress={() => {
+                setCompletedRideId(currentRide.id);
+                setShowReviewModal(true);
+                setTracking(false);
+                setDestination(null);
+                setDestLabel(null);
+                setPickup(null);
+                setPickupLabel('My location');
+                setRouteCoordinates([]);
+                clearRide();
+              }}
+              activeOpacity={0.8}
+            >
+              <Star size={18} color="#fff" />
+              <Text style={styles.confirmText}>Rate Your Ride</Text>
+            </TouchableOpacity>
+          )}
         </Animated.View>
-      )}
+      )}
+
       {}
       <IncomingRideModal
         visible={!!incomingRequest}
@@ -414,10 +541,11 @@ export default function HomeScreen() {
         ride={incomingRequest}
         onAccept={handleAcceptRide}
         loading={acceptLoading}
-      />
+      />
+
       {}
       {isDriver && currentRide && currentRide.status !== 'COMPLETED' && currentRide.status !== 'CANCELLED' && (
-        <Animated.View entering={FadeInDown.springify().damping(18)} style={styles.driverActionCard}>
+        <Animated.View entering={FadeInDown.duration(350)} style={styles.driverActionCard}>
           {currentRide.status === 'ACCEPTED' && !nearPickup && (
             <>
               <View style={styles.trackingHeader}>
@@ -428,7 +556,8 @@ export default function HomeScreen() {
                 Drive to the rider's pickup location
               </Text>
             </>
-          )}
+          )}
+
           {currentRide.status === 'ACCEPTED' && nearPickup && (
             <>
               <View style={styles.trackingHeader}>
@@ -450,7 +579,8 @@ export default function HomeScreen() {
                 </Text>
               </TouchableOpacity>
             </>
-          )}
+          )}
+
           {currentRide.status === 'IN_PROGRESS' && !nearDestination && (
             <>
               <View style={styles.trackingHeader}>
@@ -461,7 +591,8 @@ export default function HomeScreen() {
                 Heading to the destination
               </Text>
             </>
-          )}
+          )}
+
           {currentRide.status === 'IN_PROGRESS' && nearDestination && (
             <>
               <View style={styles.trackingHeader}>
@@ -485,7 +616,8 @@ export default function HomeScreen() {
             </>
           )}
         </Animated.View>
-      )}
+      )}
+
       {}
       <DestinationSearch
         visible={searchMode !== null}
@@ -504,16 +636,40 @@ export default function HomeScreen() {
         userLng={location?.longitude}
         title={searchMode === 'pickup' ? 'Where from?' : 'Where to?'}
         placeholder={searchMode === 'pickup' ? 'Search pickup location' : 'Search destination'}
-      />
+      />
+
       {}
       {errorMsg && (
         <View style={styles.errorBanner}>
           <Text style={styles.errorText}>{errorMsg}</Text>
         </View>
       )}
+
+      {/* Review Modal – shown after ride completion */}
+      {completedRideId && (
+        <ReviewModal
+          visible={showReviewModal}
+          onClose={() => {
+            setShowReviewModal(false);
+            setCompletedRideId(null);
+          }}
+          rideId={completedRideId}
+        />
+      )}
+
+      {/* Driver Reviews – rider views during ride */}
+      {currentRide?.driverId && (
+        <ReviewsList
+          visible={showDriverReviews}
+          onClose={() => setShowDriverReviews(false)}
+          userId={currentRide.driverId}
+          title="Driver Reviews"
+        />
+      )}
     </View>
   );
-}
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -679,5 +835,20 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.xl,
     ...Shadows.modal,
+  },
+  viewReviewsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    marginTop: Spacing.md,
+    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.secondaryLight,
+    borderRadius: BorderRadius.md,
+  },
+  viewReviewsBtnText: {
+    ...Typography.footnote,
+    color: Colors.secondary,
+    fontFamily: 'Inter_600SemiBold',
   },
 });

@@ -1,11 +1,17 @@
 import React from 'react';
+import { Platform } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Home, Clock, UserCircle, Car } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography } from '../../src/config/theme';
-import { useAuthStore } from '../../src/store/authStore';
+import { useAuthStore } from '../../src/store/authStore';
+
 export default function TabLayout() {
   const user = useAuthStore((s) => s.user);
-  const isDriver = user?.role === 'DRIVER';
+  const isDriver = user?.role === 'DRIVER';
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 4);
+
   return (
     <Tabs
       screenOptions={{
@@ -16,8 +22,8 @@ export default function TabLayout() {
           backgroundColor: Colors.surface,
           borderTopWidth: 0.5,
           borderTopColor: Colors.border,
-          paddingBottom: 4,
-          height: 56,
+          paddingBottom: bottomPadding,
+          height: 56 + bottomPadding,
         },
         tabBarLabelStyle: {
           fontFamily: 'Inter_500Medium',

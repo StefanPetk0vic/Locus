@@ -1,325 +1,235 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   Alert,
+  StatusBar,
+  ActivityIndicator,
 } from 'react-native';
-import {
-  Car,
-  Plus,
-  Palette,
-  Hash,
-  CircleDot,
-  CheckCircle2,
-} from 'lucide-react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { Plus, Warehouse } from 'lucide-react-native';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuthStore } from '../../src/store/authStore';
-import { userApi } from '../../src/services/api';
-import Modal from '../../src/components/Modal';
-import Input from '../../src/components/Input';
-import Button from '../../src/components/Button';
-import { Colors, Typography, Spacing, BorderRadius } from '../../src/config/theme';
+import { vehicleApi, VehicleResponse } from '../../src/services/api';
+import VehicleCard, { VehicleItem } from '../../src/components/VehicleCard';
+import AddVehicleModal from '../../src/components/AddVehicleModal';
+import { Typography, Spacing, BorderRadius } from '../../src/config/theme';
+
+/* soft-black pastel palette */
+const G = {
+  bg: '#1A1A1E',
+  surface: '#242428',
+  accent: '#FFD400',
+  accentDim: '#FFD40033',
+  text: '#F0F0F0',
+  textSec: '#9A9A9F',
+  border: '#3A3A3F',
+} as const;
 
 export default function VehicleScreen() {
-  const user = useAuthStore((s) => s.user);
-  const fetchProfile = useAuthStore((s) => s.fetchProfile);
+  const [vehicles, setVehicles] = useState<VehicleItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
 
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [licensePlate, setLicensePlate] = useState(user?.licensePlate || '');
-  const [vehicleMake, setVehicleMake] = useState('');
-  const [vehicleColor, setVehicleColor] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  const hasVehicle = !!user?.licensePlate;
-
-  const handleSave = async () => {
-    if (!licensePlate.trim()) {
-      Alert.alert('Required', 'Please enter a license plate number.');
-      return;
-    }
-    setSaving(true);
+  const fetchVehicles = useCallback(async () => {
     try {
-      await userApi.updateLicensePlate(user!.id, licensePlate.trim());
-      await fetchProfile();
-      setShowAddModal(false);
-      Alert.alert('Saved', 'Vehicle information updated.');
-    } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.message || 'Failed to update vehicle');
+      const { data } = await vehicleApi.getMyVehicles();
+      setVehicles(
+        data.map((v: VehicleResponse) => ({
+          id: v.id,
+          make: v.make,
+          model: v.model,
+          licensePlate: v.licensePlate,
+          color: v.color,
+          isActive: v.isActive,
+        })),
+      );
+    } catch {
     } finally {
-      setSaving(false);
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchVehicles();
+  }, [fetchVehicles]);
+
+  const handleActivate = async (id: string) => {
+    try {
+      await vehicleApi.activateVehicle(id);
+      fetchVehicles();
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.message || 'Failed to activate');
     }
   };
 
+  const handleDelete = (id: string) => {
+    Alert.alert('Remove Vehicle', 'Are you sure you want to remove this vehicle from your garage?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await vehicleApi.deleteVehicle(id);
+            fetchVehicles();
+          } catch (err: any) {
+            Alert.alert('Error', err?.response?.data?.message || 'Failed to delete');
+          }
+        },
+      },
+    ]);
+  };
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.title}>Vehicle</Text>
-        <Text style={styles.subtitle}>Manage your vehicle details</Text>
+    <Animated.View entering={FadeIn.duration(350)} style={styles.root}>
+      <StatusBar barStyle="light-content" />
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>My Garage</Text>
+          <TouchableOpacity
+            onPress={() => setShowAdd(true)}
+            style={styles.addBtn}
+            activeOpacity={0.7}
+          >
+            <Plus size={22} color={G.accent} />
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.subtitle}>Manage your vehicles</Text>
 
-        {hasVehicle ? (
-          
-          <Animated.View entering={FadeInDown.duration(400)} style={styles.vehicleCard}>
-            <View style={styles.vehicleIcon}>
-              <Car size={32} color={Colors.primary} strokeWidth={1.5} />
-            </View>
-
-            <View style={styles.vehicleInfo}>
-              <View style={styles.infoRow}>
-                <Hash size={15} color={Colors.textSecondary} />
-                <Text style={styles.infoLabel}>License Plate</Text>
-                <Text style={styles.infoValue}>{user?.licensePlate}</Text>
-              </View>
-              <View style={styles.infoDivider} />
-              <View style={styles.infoRow}>
-                <CheckCircle2 size={15} color={user?.isVerified ? Colors.success : Colors.textSecondary} />
-                <Text style={styles.infoLabel}>Status</Text>
-                <Text
-                  style={[
-                    styles.infoValue,
-                    { color: user?.isVerified ? Colors.success : Colors.secondary },
-                  ]}
-                >
-                  {user?.isVerified ? 'Verified' : 'Pending review'}
-                </Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.editBtn}
-              onPress={() => {
-                setLicensePlate(user?.licensePlate || '');
-                setShowAddModal(true);
-              }}
-            >
-              <Text style={styles.editBtnText}>Edit</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        ) : (
-          /* ── Empty state ── */
-          <Animated.View entering={FadeInDown.duration(400)} style={styles.emptyState}>
-            <View style={styles.emptyIcon}>
-              <Car size={48} color={Colors.border} strokeWidth={1.2} />
-            </View>
-            <Text style={styles.emptyTitle}>No vehicle added</Text>
-            <Text style={styles.emptyDesc}>
-              Add your vehicle details to start accepting ride requests.
-            </Text>
-            <Button
-              title="Add Vehicle"
-              onPress={() => setShowAddModal(true)}
-              icon={<Plus size={18} color="#fff" />}
-              style={styles.addBtn}
-            />
-          </Animated.View>
-        )}
-        
-        <Animated.View entering={FadeInDown.delay(150).duration(400)}>
-          <Text style={styles.sectionTitle}>Vehicle Details</Text>
-          <View style={styles.placeholderCard}>
-            <View style={styles.placeholderRow}>
-              <Car size={18} color={Colors.textSecondary} />
-              <Text style={styles.placeholderLabel}>Make & Model</Text>
-              <Text style={styles.placeholderValue}>Coming soon</Text>
-            </View>
-            <View style={styles.placeholderDivider} />
-            <View style={styles.placeholderRow}>
-              <Palette size={18} color={Colors.textSecondary} />
-              <Text style={styles.placeholderLabel}>Color</Text>
-              <Text style={styles.placeholderValue}>Coming soon</Text>
-            </View>
-            <View style={styles.placeholderDivider} />
-            <View style={styles.placeholderRow}>
-              <CircleDot size={18} color={Colors.textSecondary} />
-              <Text style={styles.placeholderLabel}>Year</Text>
-              <Text style={styles.placeholderValue}>Coming soon</Text>
-            </View>
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color={G.accent} />
           </View>
-        </Animated.View>
-      </ScrollView>
-      
-      <Modal
-        visible={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        title={hasVehicle ? 'Edit Vehicle' : 'Add Vehicle'}
-      >
-        <Input
-          label="License Plate"
-          placeholder="e.g. ABC-1234"
-          value={licensePlate}
-          onChangeText={setLicensePlate}
-          autoCapitalize="characters"
-          icon={<Hash size={18} color={Colors.textSecondary} />}
-        />
-        <Input
-          label="Make & Model (optional)"
-          placeholder="e.g. Toyota Camry"
-          value={vehicleMake}
-          onChangeText={setVehicleMake}
-          icon={<Car size={18} color={Colors.textSecondary} />}
-        />
-        <Input
-          label="Color (optional)"
-          placeholder="e.g. White"
-          value={vehicleColor}
-          onChangeText={setVehicleColor}
-          icon={<Palette size={18} color={Colors.textSecondary} />}
-        />
-        <Button
-          title="Save"
-          onPress={handleSave}
-          loading={saving}
-          style={{ marginTop: Spacing.sm }}
-        />
-      </Modal>
-    </SafeAreaView>
+        ) : (
+          <FlatList
+            data={vehicles}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item, index }) => (
+              <VehicleCard
+                vehicle={item}
+                index={index}
+                onActivate={handleActivate}
+                onDelete={handleDelete}
+              />
+            )}
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <Animated.View entering={FadeInDown.duration(400)} style={styles.empty}>
+                <View style={styles.emptyIcon}>
+                  <Warehouse size={48} color={G.border} strokeWidth={1.2} />
+                </View>
+                <Text style={styles.emptyTitle}>Garage is empty</Text>
+                <Text style={styles.emptyDesc}>
+                  Add your vehicles to manage them and start accepting rides.
+                </Text>
+                <TouchableOpacity
+                  style={styles.emptyAddBtn}
+                  onPress={() => setShowAdd(true)}
+                  activeOpacity={0.7}
+                >
+                  <Plus size={18} color={G.bg} />
+                  <Text style={styles.emptyAddText}>Add Vehicle</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            }
+          />
+        )}
+      </SafeAreaView>
+
+      <AddVehicleModal
+        visible={showAdd}
+        onClose={() => setShowAdd(false)}
+        onAdded={fetchVehicles}
+      />
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
-  scroll: { flex: 1 },
-  content: {
+  root: {
+    flex: 1,
+    backgroundColor: G.bg,
+  },
+  safe: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
-    paddingBottom: Spacing.xxl,
   },
-  title: {
+  headerTitle: {
     ...Typography.title1,
-    color: Colors.text,
+    color: G.text,
+  },
+  addBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: G.accentDim,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   subtitle: {
     ...Typography.subhead,
-    color: Colors.textSecondary,
+    color: G.textSec,
+    paddingHorizontal: Spacing.lg,
     marginTop: Spacing.xs,
-    marginBottom: Spacing.xl,
-  },
-  vehicleCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
     marginBottom: Spacing.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
-  vehicleIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: Colors.primaryLight,
+  loadingWrap: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.md,
   },
-  vehicleInfo: {
-    alignSelf: 'stretch',
-    marginBottom: Spacing.md,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.sm,
-  },
-  infoLabel: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
-    flex: 1,
-  },
-  infoValue: {
-    ...Typography.callout,
-    color: Colors.text,
-    fontFamily: 'Inter_600SemiBold',
-  },
-  infoDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.border,
-  },
-  editBtn: {
+  list: {
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.primaryLight,
+    paddingBottom: Spacing.xxl,
   },
-  editBtnText: {
-    ...Typography.subhead,
-    color: Colors.primary,
-    fontFamily: 'Inter_600SemiBold',
-  },
-  emptyState: {
+  empty: {
     alignItems: 'center',
-    paddingVertical: Spacing.xxl,
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    paddingVertical: Spacing.xxl * 2,
   },
   emptyIcon: {
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: Colors.background,
+    backgroundColor: G.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.lg,
   },
   emptyTitle: {
     ...Typography.title3,
-    color: Colors.text,
+    color: G.text,
     marginBottom: Spacing.xs,
   },
   emptyDesc: {
     ...Typography.subhead,
-    color: Colors.textSecondary,
+    color: G.textSec,
     textAlign: 'center',
     maxWidth: 260,
     marginBottom: Spacing.lg,
   },
-  addBtn: {
-    paddingHorizontal: Spacing.xl,
-  },
-  sectionTitle: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: Spacing.sm,
-    marginLeft: Spacing.xs,
-  },
-  placeholderCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  placeholderRow: {
+  emptyAddBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.md,
     gap: Spacing.sm,
+    backgroundColor: G.accent,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
   },
-  placeholderLabel: {
-    ...Typography.callout,
-    color: Colors.text,
-    flex: 1,
-  },
-  placeholderValue: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
-  },
-  placeholderDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.border,
-    marginLeft: Spacing.md + 18 + Spacing.sm,
+  emptyAddText: {
+    ...Typography.headline,
+    color: G.bg,
+    fontSize: 15,
   },
 });

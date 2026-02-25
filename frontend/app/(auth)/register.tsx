@@ -15,11 +15,14 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import Input from '../../src/components/Input';
 import Button from '../../src/components/Button';
 import { useAuthStore } from '../../src/store/authStore';
-import { Colors, Typography, Spacing, BorderRadius } from '../../src/config/theme';
-type Role = 'RIDER' | 'DRIVER';
+import { Colors, Typography, Spacing, BorderRadius } from '../../src/config/theme';
+
+type Role = 'RIDER' | 'DRIVER';
+
 export default function Register() {
   const router = useRouter();
-  const register = useAuthStore((s) => s.register);
+  const register = useAuthStore((s) => s.register);
+
   const [role, setRole] = useState<Role | null>(null);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -27,7 +30,8 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [licensePlate, setLicensePlate] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
   const validate = () => {
     const errs: Record<string, string> = {};
     if (!firstName.trim()) errs.firstName = 'First name is required';
@@ -38,7 +42,8 @@ export default function Register() {
     if (role === 'DRIVER' && !licensePlate.trim()) errs.licensePlate = 'License plate is required';
     setErrors(errs);
     return Object.keys(errs).length === 0;
-  };
+  };
+
   const handleRegister = async () => {
     if (!validate()) return;
     setLoading(true);
@@ -60,14 +65,16 @@ export default function Register() {
     } finally {
       setLoading(false);
     }
-  };  
+  };
+  
   if (!role) {
     return (
       <View style={styles.container}>
         <Animated.View entering={FadeInDown.duration(500)} style={styles.roleHeader}>
           <Text style={styles.title}>Join Locus</Text>
           <Text style={styles.subtitle}>How would you like to use the app?</Text>
-        </Animated.View>
+        </Animated.View>
+
         <Animated.View entering={FadeInDown.delay(150).duration(500)} style={styles.roleCards}>
           <TouchableOpacity
             style={styles.roleCard}
@@ -79,7 +86,8 @@ export default function Register() {
             </View>
             <Text style={styles.roleTitle}>Rider</Text>
             <Text style={styles.roleDesc}>Request rides and get where you need to go</Text>
-          </TouchableOpacity>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.roleCard}
             activeOpacity={0.7}
@@ -91,7 +99,8 @@ export default function Register() {
             <Text style={styles.roleTitle}>Driver</Text>
             <Text style={styles.roleDesc}>Earn money by driving passengers around</Text>
           </TouchableOpacity>
-        </Animated.View>
+        </Animated.View>
+
         <View style={styles.footer}>
           <Text style={styles.footerText}>Already have an account?</Text>
           <TouchableOpacity onPress={() => router.back()}>
@@ -100,11 +109,12 @@ export default function Register() {
         </View>
       </View>
     );
-  }  
+  }
+  
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -118,14 +128,16 @@ export default function Register() {
         >
           <ChevronLeft size={20} color={Colors.primary} />
           <Text style={styles.backText}>Change role</Text>
-        </TouchableOpacity>
+        </TouchableOpacity>
+
         {}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
           <Text style={styles.title}>
             Sign up as {role === 'RIDER' ? 'Rider' : 'Driver'}
           </Text>
           <Text style={styles.subtitle}>Create your account to get started</Text>
-        </Animated.View>
+        </Animated.View>
+
         {}
         <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.form}>
           <View style={styles.nameRow}>
@@ -146,7 +158,8 @@ export default function Register() {
               error={errors.lastName}
               containerStyle={styles.nameInput}
             />
-          </View>
+          </View>
+
           <Input
             label="Email"
             placeholder="you@example.com"
@@ -157,7 +170,8 @@ export default function Register() {
             autoComplete="email"
             error={errors.email}
             icon={<Mail size={18} color={Colors.textSecondary} />}
-          />
+          />
+
           <Input
             label="Password"
             placeholder="Min 8 characters, 1 uppercase, 1 number, 1 symbol"
@@ -166,7 +180,8 @@ export default function Register() {
             secureTextEntry
             error={errors.password}
             icon={<Lock size={18} color={Colors.textSecondary} />}
-          />
+          />
+
           {role === 'DRIVER' && (
             <Input
               label="License plate"
@@ -177,14 +192,16 @@ export default function Register() {
               error={errors.licensePlate}
               icon={<Car size={18} color={Colors.textSecondary} />}
             />
-          )}
+          )}
+
           <Button
             title="Create Account"
             onPress={handleRegister}
             loading={loading}
             style={styles.button}
           />
-        </Animated.View>
+        </Animated.View>
+
         <View style={styles.footer}>
           <Text style={styles.footerText}>Already have an account?</Text>
           <TouchableOpacity onPress={() => router.replace('/(auth)/login')}>
@@ -194,7 +211,8 @@ export default function Register() {
       </ScrollView>
     </KeyboardAvoidingView>
   );
-}
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: Colors.background },
   container: {

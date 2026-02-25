@@ -1,17 +1,21 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { MapPin, Navigation2, Clock } from 'lucide-react-native';
+import { MapPin, Navigation2, Clock, Star } from 'lucide-react-native';
 import Modal from './Modal';
 import Button from './Button';
+import UserRatingBadge from './UserRatingBadge';
 import { Colors, Typography, Spacing, BorderRadius } from '../config/theme';
-import { RideRequestData } from '../store/rideStore';
+import { RideRequestData } from '../store/rideStore';
+import { reverseGeocode } from '../utils/reverseGeocode';
+
 interface Props {
   visible: boolean;
   onClose: () => void;
   ride: RideRequestData | null;
   onAccept: () => void;
   loading?: boolean;
-}
+}
+
 export default function IncomingRideModal({
   visible,
   onClose,
@@ -19,37 +23,59 @@ export default function IncomingRideModal({
   onAccept,
   loading,
 }: Props) {
-  if (!ride) return null;
+  const [pickupAddr, setPickupAddr] = useState('');
+  const [destAddr, setDestAddr] = useState('');
+
+  useEffect(() => {
+    if (!ride) return;
+    reverseGeocode(ride.pickup.lat, ride.pickup.lng).then(setPickupAddr);
+    reverseGeocode(ride.destination.lat, ride.destination.lng).then(setDestAddr);
+  }, [ride?.pickup.lat, ride?.pickup.lng, ride?.destination.lat, ride?.destination.lng]);
+
+  if (!ride) return null;
+
   return (
     <Modal visible={visible} onClose={onClose} title="New Ride Request" position="bottom">
-      {}
+      {/* Rider rating badge */}
+      {ride.riderId && (
+        <View style={styles.riderInfoRow}>
+          <Text style={styles.riderLabel}>Rider rating:</Text>
+          <UserRatingBadge userId={ride.riderId} />
+        </View>
+      )}
+
+      {/* Route card with addresses */}
       <View style={styles.card}>
         <View style={styles.row}>
           <MapPin size={18} color={Colors.primary} />
           <View style={styles.info}>
             <Text style={styles.label}>Pickup</Text>
-            <Text style={styles.value}>
-              {ride.pickup.lat.toFixed(4)}, {ride.pickup.lng.toFixed(4)}
+            <Text style={styles.value} numberOfLines={2}>
+              {pickupAddr || 'Loading address...'}
             </Text>
           </View>
-        </View>
-        <View style={styles.divider} />
+        </View>
+
+        <View style={styles.divider} />
+
         <View style={styles.row}>
           <Navigation2 size={18} color={Colors.secondary} />
           <View style={styles.info}>
             <Text style={styles.label}>Destination</Text>
-            <Text style={styles.value}>
-              {ride.destination.lat.toFixed(4)}, {ride.destination.lng.toFixed(4)}
+            <Text style={styles.value} numberOfLines={2}>
+              {destAddr || 'Loading address...'}
             </Text>
           </View>
         </View>
-      </View>
-      {}
+      </View>
+
+      {/* Time */}
       <View style={styles.timeRow}>
         <Clock size={14} color={Colors.textSecondary} />
         <Text style={styles.timeText}>Just now</Text>
-      </View>
-      {}
+      </View>
+
+      {/* Actions */}
       <View style={styles.actions}>
         <Button
           title="Decline"
@@ -66,8 +92,20 @@ export default function IncomingRideModal({
       </View>
     </Modal>
   );
-}
+}
+
 const styles = StyleSheet.create({
+  riderInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.xs,
+  },
+  riderLabel: {
+    ...Typography.footnote,
+    color: Colors.textSecondary,
+  },
   card: {
     backgroundColor: Colors.background,
     borderRadius: BorderRadius.md,
