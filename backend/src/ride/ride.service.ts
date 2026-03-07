@@ -165,7 +165,6 @@ export class RideService {
 
     const updatedRide = await this.rideRepository.save(ride);
 
-    // Cancel the pre-authorized payment
     await this.paymentService.cancelRidePayment(rideId);
 
     this.kafkaClient.emit('ride.cancelled', {
@@ -188,7 +187,6 @@ export class RideService {
 
     await this.userService.incrementRiderRideCount(ride.riderId);
 
-    // Capture the pre-authorized payment
     let paymentStatus = 'success';
     try {
       const invoice = await this.paymentService.captureRidePayment(rideId);

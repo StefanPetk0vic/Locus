@@ -166,4 +166,19 @@ export class UserService {
     }
     return this.redisService.geoadd('drivers:active', longitude, latitude, driverId);
   }
+
+  async getNearbyDrivers(
+    longitude: number,
+    latitude: number,
+    radiusKm = 10,
+  ): Promise<{ id: string; latitude: number; longitude: number }[]> {
+    return this.redisService.georadiusWithCoords(
+      'drivers:active',
+      longitude,
+      latitude,
+      radiusKm,
+      'km',
+      20,
+    );
+  }
 }

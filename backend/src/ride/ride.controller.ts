@@ -115,13 +115,7 @@ export class RideController implements OnModuleInit {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.DRIVER)
   async startRide(@Param('id') rideId: string, @GetUser() driver: User) {
-    const ride = await this.rideService.startRide(rideId, driver.id);
-    this.rideGateway.notifyRiderAboutRideStarted(ride.riderId, {
-      rideId: ride.id,
-      driverId: ride.driverId,
-      status: ride.status,
-    });
-    return ride;
+    return this.rideService.startRide(rideId, driver.id);
   }
 
   @Patch('/:id/complete')
@@ -132,15 +126,7 @@ export class RideController implements OnModuleInit {
     if (!ride) throw new Error('Ride not found');
     if (ride.driverId !== driver.id)
       throw new Error('You are not the driver of this ride');
-    const completed = await this.rideService.completeRide(rideId);
-    this.rideGateway.notifyRiderAboutRideCompleted(completed.riderId, {
-      rideId: completed.id,
-      driverId: completed.driverId,
-      status: completed.status,
-      price: completed.price,
-      paymentStatus: 'PAID',
-    });
-    return completed;
+    return this.rideService.completeRide(rideId);
   }
 
   @EventPattern('ride.requested')
@@ -183,6 +169,66 @@ export class RideController implements OnModuleInit {
       rideId: message.rideId,
       driverId: message.driverId,
       status: 'accepted',
+      timestamp: new Date(),
+    });
+  }
+
+  @EventPattern('ride.started')
+  async handleRideStarted(@Payload() payload: any) {
+    const message = payload?.value ?? payload;
+
+    this.logger.log('Voznja zapoceta:', message);
+
+    if (!message?.riderId) {
+      this.logger.error('ride.started payload missing riderId', payload);
+      return;
+    }
+
+    this.rideGateway.notifyRiderAboutRideStarted(message.riderId, {
+      rideId: message.rideId,
+      driverId: message.driverId,
+      status: message.status,
+      timestamp: new Date(),
+    });
+  }
+
+  @EventPattern('ride.cancelled')
+  async handleRideCancelled(@Payload() payload: any) {
+    const message = payload?.value ?? payload;
+
+    this.logger.log('Ride cancelled:', message);
+
+    if (!message?.riderId) {
+      this.logger.error('ride.cancelled payload missing riderId', payload);
+      return;
+    }
+
+    this.rideGateway.cancelBatchTimeout(message.rideId);
+
+    this.rideGateway.notifyRideCancelled(message.riderId, message.driverId ?? null, {
+      rideId: message.rideId,
+      driverId: message.driverId,
+      status: message.status,
+      timestamp: new Date(),
+    });
+  }
+
+  @EventPattern('ride.completed')
+  async handleRideCompleted(@Payload() payload: any) {
+    const message = payload?.value ?? payload;
+
+    this.logger.log('Ride completed:', message);
+
+    if (!message?.riderId) {
+      this.logger.error('ride.completed payload missing riderId', payload);
+      return;
+    }
+
+    this.rideGateway.notifyRiderAboutRideCompleted(message.riderId, {
+      rideId: message.rideId,
+      driverId: message.driverId,
+      status: message.status,
+      paymentStatus: message.paymentStatus,
       timestamp: new Date(),
     });
   }

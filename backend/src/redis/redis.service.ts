@@ -83,4 +83,23 @@ export class RedisService implements OnModuleDestroy {
       'ASC', 'COUNT', count,
     )) as string[];
   }
+
+  async georadiusWithCoords(
+    key: string,
+    longitude: number,
+    latitude: number,
+    radius: number,
+    unit: string,
+    count: number,
+  ): Promise<{ id: string; longitude: number; latitude: number }[]> {
+    const result = await this.redis.georadius(
+      key, longitude, latitude, radius, unit,
+      'WITHCOORD', 'ASC', 'COUNT', count,
+    ) as any[];
+    return result.map((item: any) => ({
+      id: item[0] as string,
+      longitude: parseFloat(item[1][0]),
+      latitude: parseFloat(item[1][1]),
+    }));
+  }
 }

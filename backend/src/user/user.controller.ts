@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Patch, Param, Body, Post, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, UseGuards, Patch, Param, Body, Post, ForbiddenException, Query } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { User } from './infrastructure/user.entity';
 import { Rider } from './infrastructure/rider.entity';
@@ -14,7 +14,7 @@ export class UserController {
   @Get('/profile')
   getProfile(@GetUser() user: User) {
     const profile: any = { ...user };
-    // Expose whether rider has a payment method without leaking Stripe IDs
+    
     if (user instanceof Rider) {
       profile.hasPaymentMethod = !!user.stripePaymentMethodId;
     }
@@ -66,6 +66,18 @@ export class UserController {
   @Get('/drivers/verified')
   async getVerifiedDrivers() {
     return await this.userService.getVerifiedDrivers();
+  }
+
+  @Get('/drivers/nearby')
+  async getNearbyDrivers(
+    @Query('lat') lat: string,
+    @Query('lng') lng: string,
+    @Query('radius') radius?: string,
+  ) {
+    const latitude = parseFloat(lat);
+    const longitude = parseFloat(lng);
+    const radiusKm = radius ? parseFloat(radius) : 10;
+    return this.userService.getNearbyDrivers(longitude, latitude, radiusKm);
   }
 
   @Get('/riders')

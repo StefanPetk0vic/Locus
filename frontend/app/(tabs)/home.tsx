@@ -40,7 +40,7 @@ export default function HomeScreen() {
   const user = useAuthStore((s) => s.user);
   const isDriver = user?.role === 'DRIVER';
 
-  const { location, nearbyDrivers, startWatching, errorMsg } = useLocationStore();
+  const { location, nearbyDrivers, startWatching, fetchNearbyDrivers, errorMsg } = useLocationStore();
   const {
     currentRide,
     incomingRequest,
@@ -101,6 +101,21 @@ export default function HomeScreen() {
 
     return () => clearInterval(interval);
   }, [isDriver, user?.id, !!location]);
+
+  useEffect(() => {
+    if (isDriver || !location) return;
+
+    fetchNearbyDrivers(location.latitude, location.longitude);
+
+    const interval = setInterval(() => {
+      const loc = useLocationStore.getState().location;
+      if (loc) {
+        fetchNearbyDrivers(loc.latitude, loc.longitude);
+      }
+    }, 30_000);
+
+    return () => clearInterval(interval);
+  }, [isDriver, !!location]);
 
   useEffect(() => {
     if (!location || hasCenteredOnUser.current) return;

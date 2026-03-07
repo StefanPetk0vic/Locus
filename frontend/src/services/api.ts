@@ -78,6 +78,10 @@ export const userApi = {
     api.patch(`/users/drivers/${driverId}/license-plate`, { licensePlate }),
   updateDriverLocation: (driverId: string, latitude: number, longitude: number) =>
     api.post(`/users/drivers/${driverId}/update-location`, { latitude, longitude }),
+  getNearbyDrivers: (lat: number, lng: number, radius?: number) =>
+    api.get<{ id: string; latitude: number; longitude: number }[]>('/users/drivers/nearby', {
+      params: { lat, lng, ...(radius !== undefined && { radius }) },
+    }),
 };
 
 export interface RideRequest {

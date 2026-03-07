@@ -221,6 +221,26 @@ export class RideGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  notifyRideCancelled(riderId: string, driverId: string | null, rideData: any) {
+    const riderSocketId = this.riderSockets.get(riderId);
+    if (riderSocketId) {
+      this.logger.log(`Notifying rider ${riderId} about ride cancelled`);
+      this.server.to(riderSocketId).emit('ride.cancelled', rideData);
+    } else {
+      this.logger.warn(`Rider ${riderId} is not connected (ride.cancelled)`);
+    }
+
+    if (driverId) {
+      const driverSocketId = this.driverSockets.get(driverId);
+      if (driverSocketId) {
+        this.logger.log(`Notifying driver ${driverId} about ride cancelled`);
+        this.server.to(driverSocketId).emit('ride.cancelled', rideData);
+      } else {
+        this.logger.warn(`Driver ${driverId} is not connected (ride.cancelled)`);
+      }
+    }
+  }
+
     @SubscribeMessage('driver.location.update')
   async handleDriverLocationUpdate(
     @ConnectedSocket() client: AuthenticatedSocket,

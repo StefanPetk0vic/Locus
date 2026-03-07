@@ -2,9 +2,9 @@ import { Platform } from 'react-native';
 
 const DEV_HOST = Platform.select({
   
-  android: 'https://6e1d-109-245-144-246.ngrok-free.app',
-  ios: 'https://6e1d-109-245-144-246.ngrok-free.app',
-  default: 'https://6e1d-109-245-144-246.ngrok-free.app',
+  android: 'https://untinselled-faintingly-riva.ngrok-free.dev',
+  ios: 'https://untinselled-faintingly-riva.ngrok-free.dev',
+  default: 'https://untinselled-faintingly-riva.ngrok-free.dev',
 });
 
 export const API_BASE_URL = DEV_HOST;
